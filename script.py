@@ -22,15 +22,19 @@ while(True):
     # Read from the server
     # print("     waiting for server to talk")
     data = s.recv(1000).decode()
-    print("     received from server:")
-    print("     "+data)
+#    print("received from server:")
+#    print("     "+data)
+
+    data.replace('\n', ' ');
+    data.replace('\r', ' ');
     
-    imageIndex = data[6:]
-    print("     rendering image <"+imageIndex+">")
-    time.sleep(2)
+    imageIndex = data.split(" ")[1]
+    
+    print("     received from server <"+imageIndex+">")
+    time.sleep(1)
     
     # Send reply to server
     # print("     Sending to server...")
-    stringToSend = "rendered "+imageIndex+"\n"
+    stringToSend = "NODE ONE rendered "+imageIndex+"\n"
     s.send(stringToSend.encode())
     # print("     Sending to server DONE")
