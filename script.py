@@ -15,6 +15,7 @@ print("START ----------------------------------------------")
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((address, port))
 hostname = socket.gethostname()
+clientNumber = -1
 
 try:
     loop = True
@@ -26,6 +27,10 @@ try:
             # end detected.
             loop = False
             print("Detecting end")
+
+        elif (clientNumber==-1 and data.find("Node") >= 0):
+            clientNumber = data.split(" ")[1]
+            clientNumber.replace("\n", "")
 
         else:
             imageIndex = data.split(" ")[1]
@@ -43,7 +48,7 @@ try:
             bpy.ops.render.render(write_still = True)
             
             # Send reply to server
-            stringToSend = hostname + " rendered "+str(imageIndex)+"\n"
+            stringToSend = "client " + clientNumber + " rendered " + str(imageIndex) + "\n"
             s.send(stringToSend.encode())
 
 except ConnectionResetError as e:
