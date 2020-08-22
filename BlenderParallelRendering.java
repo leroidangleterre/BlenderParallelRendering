@@ -17,7 +17,8 @@ import java.net.Socket;
  */
 public class BlenderParallelRendering {
 
-    public static int IMAGE_INDEX = 4483;
+    public static int START_IMAGE_INDEX = 4501;
+    public static int IMAGE_INDEX = START_IMAGE_INDEX;
     public static final int MAX_IMAGE_INDEX = 4856;
 //    public static final int[] array = {
 //        3476, 3477, 3481, 3488, 3498, 3509, 3521, 3532, 3544, 3802, 3827, 3880,
@@ -25,6 +26,9 @@ public class BlenderParallelRendering {
 //        4170, 4172, 4173, 4174, 4175, 4176, 4177, 4178, 4179, 4180, 4181, 4856};
 
     public static int NODE_NUMBER = 0;
+
+    public static long startDate;
+    public static int nbImagesNeeded;
 
     /**
      * @param args the command line arguments
@@ -36,6 +40,10 @@ public class BlenderParallelRendering {
         ServerSocket serverSocket = new ServerSocket(port);
         InetAddress localhost = InetAddress.getLocalHost();
         System.out.println("address: " + localhost.getHostAddress());
+
+        startDate = System.currentTimeMillis();
+
+        nbImagesNeeded = MAX_IMAGE_INDEX - IMAGE_INDEX;
 
         while (true) {
             Socket clientSocket = serverSocket.accept();
@@ -87,7 +95,7 @@ public class BlenderParallelRendering {
                         fromClient = in.readLine();
                     } while (fromClient.isEmpty());
 
-                    System.out.println("    client replied: <" + fromClient + ">");
+                    System.out.println("    client replied: <" + fromClient + ">" + getETA(index));
 
                     if (IMAGE_INDEX > MAX_IMAGE_INDEX) {
                         loop = false;
@@ -97,6 +105,23 @@ public class BlenderParallelRendering {
             } catch (IOException e) {
                 System.out.println("Error in handling connection");
             }
+        }
+
+        /**
+         * Estimate the remaining time, using startDate, nbImagesNeeded, and the
+         * current index.
+         *
+         * @return a String representing the ETA.
+         */
+        private String getETA(int currentIndex) {
+
+            long elapsedMillisec = System.currentTimeMillis() - startDate;
+            long averageMillisec = 0;
+            if (currentIndex != START_IMAGE_INDEX) {
+                averageMillisec = elapsedMillisec / (currentIndex - START_IMAGE_INDEX);
+            }
+            long estimatedSeconds = (averageMillisec * (MAX_IMAGE_INDEX - currentIndex)) / 1000;
+            return estimatedSeconds + "s remaining.";
         }
     }
 
