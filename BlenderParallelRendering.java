@@ -1,4 +1,4 @@
-/** This code is the server that dispatches workload on the computers
+/** This code is the server that balances the workload on the computers
  * rendering an animation.
  */
 package blenderparallelrendering;
@@ -17,18 +17,22 @@ import java.net.Socket;
  */
 public class BlenderParallelRendering {
 
-    public static int START_IMAGE_INDEX = 4501;
+    public static int START_IMAGE_INDEX = 3456;
     public static int IMAGE_INDEX = START_IMAGE_INDEX;
-    public static final int MAX_IMAGE_INDEX = 4856;
-//    public static final int[] array = {
-//        3476, 3477, 3481, 3488, 3498, 3509, 3521, 3532, 3544, 3802, 3827, 3880,
-//        3956, 3978, 4149, 4161, 4162, 4163, 4164, 4165, 4166, 4167, 4168, 4169,
-//        4170, 4172, 4173, 4174, 4175, 4176, 4177, 4178, 4179, 4180, 4181, 4856};
+    public static final int MAX_IMAGE_INDEX = 4855;
+    public static boolean USING_ARRAY = false;
+    public static final int[] array = {
+        4487, 4496, 4503, 4504, 4511, 4513, 4520, 4523,
+        4528, 4535, 4537, 4545, 4547, 4553, 4559, 4562, 4569, 4572, 4577, 4583,
+        4585, 4592, 4594, 4600, 4602, 4610, 4617, 4625, 4632, 4639, 4646, 4652,
+        4660, 4668, 4676, 4683, 4690, 4698, 4706, 4713, 4714, 4856};
 
     public static int NODE_NUMBER = 0;
 
     public static long startDate;
     public static int nbImagesNeeded;
+
+    public static int nbClientsConnected = 0;
 
     /**
      * @param args the command line arguments
@@ -43,7 +47,13 @@ public class BlenderParallelRendering {
 
         startDate = System.currentTimeMillis();
 
-        nbImagesNeeded = MAX_IMAGE_INDEX - IMAGE_INDEX;
+        nbImagesNeeded = MAX_IMAGE_INDEX - START_IMAGE_INDEX + 1;
+        System.out.println("Rendering " + nbImagesNeeded + " images.");
+
+        // When the array is used, we start counting at zero.
+        if (USING_ARRAY) {
+            IMAGE_INDEX = 0;
+        }
 
         while (true) {
             Socket clientSocket = serverSocket.accept();
@@ -53,14 +63,16 @@ public class BlenderParallelRendering {
     }
 
     /**
-     * Increment the index and return the new value.
-     * Synchronization makes sure two threads will receive different values.
+     * Increment the index and return the new value. Synchronization makes sure
+     * two threads will receive different values.
      *
      * @return the image index that the thread must render.
      */
     public static synchronized int getNextImageIndex() {
         IMAGE_INDEX++;
-//        return array[IMAGE_INDEX - 1];
+        if (USING_ARRAY) {
+            return array[IMAGE_INDEX - 1];
+        }
         return IMAGE_INDEX;
     }
 
@@ -71,6 +83,7 @@ public class BlenderParallelRendering {
 
         public ConnectionHandler(Socket s) {
             clientSocket = s;
+            nbClientsConnected++;
         }
 
         @Override
@@ -95,7 +108,7 @@ public class BlenderParallelRendering {
                         fromClient = in.readLine();
                     } while (fromClient.isEmpty());
 
-                    System.out.println("    client replied: <" + fromClient + ">" + getETA(index));
+                    System.out.println(fromClient + ", " + getETA(index));
 
                     if (IMAGE_INDEX > MAX_IMAGE_INDEX) {
                         loop = false;
@@ -104,6 +117,7 @@ public class BlenderParallelRendering {
                 out.println("END");
             } catch (IOException e) {
                 System.out.println("Error in handling connection");
+                nbClientsConnected--;
             }
         }
 
@@ -116,13 +130,50 @@ public class BlenderParallelRendering {
         private String getETA(int currentIndex) {
 
             long elapsedMillisec = System.currentTimeMillis() - startDate;
-            long averageMillisec = 0;
-            if (currentIndex != START_IMAGE_INDEX) {
-                averageMillisec = elapsedMillisec / (currentIndex - START_IMAGE_INDEX);
+            long averageMillisec;
+
+//            long estimatedSeconds = (averageMillisec * (MAX_IMAGE_INDEX - currentIndex)) / 1000;
+//            return estimatedSeconds + "s remaining.";
+            int nbRemainingImages;
+            if (USING_ARRAY) {
+                nbRemainingImages = array.length - currentIndex;
+            } else {
+                nbRemainingImages = MAX_IMAGE_INDEX - currentIndex + 1;
             }
-            long estimatedSeconds = (averageMillisec * (MAX_IMAGE_INDEX - currentIndex)) / 1000;
-            return estimatedSeconds + "s remaining.";
+
+            int nbImagesDone = nbImagesNeeded - nbRemainingImages;
+
+            if (currentIndex != START_IMAGE_INDEX) {
+                averageMillisec = elapsedMillisec / nbImagesDone;
+                System.out.println((elapsedMillisec / 1000) + " s elapsed; " + nbImagesDone + " images done; "
+                        + averageMillisec + " ms average with " + nbClientsConnected + " clients.");
+                System.out.println("ETA: " + getHMS((int) (averageMillisec * nbRemainingImages / 1000)));
+            }
+
+            return nbRemainingImages + " remaining images";
         }
+    }
+
+    private static String getHMS(int nbSec) {
+        String result = "";
+        int nbHours = nbSec / 3600;
+        if (nbHours > 0) {
+            result += nbHours + ":";
+        }
+
+        int nbMin = (nbSec - 3600 * nbHours) / 60;
+        if (nbSec > 60) {
+            if (nbMin < 10) {
+                result += "0";
+            }
+            result += nbMin + ":";
+        }
+        nbSec = nbSec - 3600 * nbHours - 60 * nbMin;
+        if (nbSec < 10) {
+            result += "0";
+        }
+        result += nbSec + "\"";
+        return result;
     }
 
 }
