@@ -31,6 +31,7 @@ public class BlenderParallelRendering {
 
     public static long startDate;
     public static int nbImagesNeeded;
+    public static int nbImagesDone;
 
     public static int nbClientsConnected = 0;
 
@@ -53,7 +54,10 @@ public class BlenderParallelRendering {
         // When the array is used, we start counting at zero.
         if (USING_ARRAY) {
             IMAGE_INDEX = 0;
+            nbImagesNeeded = array.length;
         }
+
+        nbImagesDone = 0;
 
         while (true) {
             Socket clientSocket = serverSocket.accept();
@@ -64,11 +68,15 @@ public class BlenderParallelRendering {
 
     /**
      * Increment the index and return the new value. Synchronization makes sure
-     * two threads will receive different values.
+     * no image index is sent twice.
      *
      * @return the image index that the thread must render.
      */
     public static synchronized int getNextImageIndex() {
+
+        // One more image is being processed.
+        nbImagesDone++; // TODO: this should be done when an image is confirmed.
+
         IMAGE_INDEX++;
         if (USING_ARRAY) {
             return array[IMAGE_INDEX - 1];
@@ -108,7 +116,8 @@ public class BlenderParallelRendering {
                         fromClient = in.readLine();
                     } while (fromClient.isEmpty());
 
-                    System.out.println(fromClient + ", " + getETA(index));
+//                    System.out.println(fromClient);
+                    System.out.println(getETA());
 
                     if (IMAGE_INDEX > MAX_IMAGE_INDEX) {
                         loop = false;
@@ -122,35 +131,34 @@ public class BlenderParallelRendering {
         }
 
         /**
-         * Estimate the remaining time, using startDate, nbImagesNeeded, and the
-         * current index.
+         * Estimate the remaining time, using the number of images needed and
+         * the number of images already processed.
          *
          * @return a String representing the ETA.
          */
-        private String getETA(int currentIndex) {
+        private String getETA() {
 
             long elapsedMillisec = System.currentTimeMillis() - startDate;
-            long averageMillisec;
 
-//            long estimatedSeconds = (averageMillisec * (MAX_IMAGE_INDEX - currentIndex)) / 1000;
-//            return estimatedSeconds + "s remaining.";
-            int nbRemainingImages;
-            if (USING_ARRAY) {
-                nbRemainingImages = array.length - currentIndex;
+            int nbRemainingImages = nbImagesNeeded - nbImagesDone;
+
+            int averageMillisec = (int) (elapsedMillisec / nbImagesDone);
+
+            int estimatedRemainingMillisec = averageMillisec * nbRemainingImages;
+
+            String result = "Elapsed: " + elapsedMillisec / 1000 + " s, "
+                    + "remaining: " + estimatedRemainingMillisec / 1000 + " s; "
+                    + "est. total: " + (elapsedMillisec + estimatedRemainingMillisec) / 1000 + " s "
+                    + "; Average: ";
+            if (averageMillisec > 10000) {
+                result += averageMillisec / 1000 + " s/i; ";
             } else {
-                nbRemainingImages = MAX_IMAGE_INDEX - currentIndex + 1;
+                result += averageMillisec + " ms/i; ";
             }
 
-            int nbImagesDone = nbImagesNeeded - nbRemainingImages;
+            result += nbRemainingImages + " remaining images";
 
-            if (currentIndex != START_IMAGE_INDEX) {
-                averageMillisec = elapsedMillisec / nbImagesDone;
-                System.out.println((elapsedMillisec / 1000) + " s elapsed; " + nbImagesDone + " images done; "
-                        + averageMillisec + " ms average with " + nbClientsConnected + " clients.");
-                System.out.println("ETA: " + getHMS((int) (averageMillisec * nbRemainingImages / 1000)));
-            }
-
-            return nbRemainingImages + " remaining images";
+            return result;
         }
     }
 
