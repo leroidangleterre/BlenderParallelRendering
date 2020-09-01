@@ -3,6 +3,7 @@
  */
 package blenderparallelrendering;
 
+import java.awt.Dimension;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -10,6 +11,7 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import javax.swing.JFrame;
 
 /**
  *
@@ -35,6 +37,9 @@ public class BlenderParallelRendering {
 
     public static int nbClientsConnected = 0;
 
+    private static JFrame window;
+    private static int width = 500, height = 500;
+
     /**
      * @param args the command line arguments
      * @throws java.io.IOException
@@ -59,9 +64,23 @@ public class BlenderParallelRendering {
 
         nbImagesDone = 0;
 
+        window = new JFrame();
+
+        window.setPreferredSize(new Dimension(width, height));
+        window.setSize(new Dimension(width, height));
+        window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        ProgressDisplay display = new ProgressDisplay(nbImagesNeeded, START_IMAGE_INDEX);
+
+        display.setPreferredSize(new Dimension(width, height));
+        display.setSize(new Dimension(width, height));
+
+        window.setContentPane(display);
+        window.setVisible(true);
+
         while (true) {
             Socket clientSocket = serverSocket.accept();
-            new Thread(new ConnectionHandler(clientSocket)).start();
+            new Thread(new ConnectionHandler(clientSocket, display)).start();
         }
 
     }
@@ -88,10 +107,16 @@ public class BlenderParallelRendering {
 
         String fromClient;
         Socket clientSocket;
+        ProgressDisplay display;
 
         public ConnectionHandler(Socket s) {
+            this(s, null);
+        }
+
+        private ConnectionHandler(Socket s, ProgressDisplay d) {
             clientSocket = s;
             nbClientsConnected++;
+            display = d;
         }
 
         @Override
@@ -116,11 +141,20 @@ public class BlenderParallelRendering {
                         fromClient = in.readLine();
                     } while (fromClient.isEmpty());
 
-//                    System.out.println(fromClient);
+//                    fromClient is equal to "client 127.0.0.42 rendered 1234"
+                    String clientIP = fromClient.split(" ")[1];
+                    String tab[] = clientIP.split("\\.");
+                    int clientPort = Integer.valueOf(tab[3]);
+
+                    int renderedImageIndex = Integer.valueOf(fromClient.split(" ")[3]);
+
+                    display.update(renderedImageIndex, clientPort);
+
                     System.out.println(getETA());
 
-                    if (IMAGE_INDEX > MAX_IMAGE_INDEX) {
+                    if (nbImagesDone >= nbImagesNeeded) {
                         loop = false;
+                        System.out.println("Render finished.");
                     }
                 }
                 out.println("END");

@@ -12,9 +12,13 @@ address = '192.168.1.88'
 
 print("START ----------------------------------------------")
 
+localhostName = socket.gethostname()
+print("hostname: "+localhostName)
+localIP = socket.gethostbyname(localhostName)
+print("local ip: "+localIP)
+
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((address, port))
-hostname = socket.gethostname()
 clientNumber = -1
 
 try:
@@ -48,7 +52,7 @@ try:
             bpy.ops.render.render(write_still = True)
             
             # Send reply to server
-            stringToSend = "client " + clientNumber + " rendered " + str(imageIndex) + "\n"
+            stringToSend = "client " + localIP + " rendered " + str(imageIndex) + "\n"
             s.send(stringToSend.encode())
 
 except ConnectionResetError as e:
