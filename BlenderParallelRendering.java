@@ -3,6 +3,7 @@
  */
 package blenderparallelrendering;
 
+import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -11,7 +12,9 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JPanel;
 
 /**
  *
@@ -38,7 +41,8 @@ public class BlenderParallelRendering {
     public static int nbClientsConnected = 0;
 
     private static JFrame window;
-    private static int width = 500, height = 500;
+    private static int width = 1000, height = 1000;
+    private static ProgressDisplay display;
 
     /**
      * @param args the command line arguments
@@ -70,12 +74,20 @@ public class BlenderParallelRendering {
         window.setSize(new Dimension(width, height));
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        ProgressDisplay display = new ProgressDisplay(nbImagesNeeded, START_IMAGE_INDEX);
+        display = new ProgressDisplay(nbImagesNeeded, START_IMAGE_INDEX, USING_ARRAY);
 
         display.setPreferredSize(new Dimension(width, height));
         display.setSize(new Dimension(width, height));
 
-        window.setContentPane(display);
+        if (!USING_ARRAY) {
+            display.setFirstImageIndex(START_IMAGE_INDEX);
+        }
+
+        window.setLayout(new BorderLayout());
+        JPanel buttonsPanel = new JPanel();
+        setButtons(buttonsPanel);
+        window.add(buttonsPanel, BorderLayout.NORTH);
+        window.add(display);
         window.setVisible(true);
 
         while (true) {
@@ -85,9 +97,25 @@ public class BlenderParallelRendering {
 
     }
 
+    private static void setButtons(JPanel p) {
+        JButton moreColsButton = new JButton("more cols");
+
+        moreColsButton.addActionListener((e) -> {
+            display.increaseNbCols(true);
+        });
+
+        JButton fewerColsButton = new JButton("fewer cols");
+        fewerColsButton.addActionListener((e) -> {
+            display.increaseNbCols(false);
+        });
+
+        p.add(moreColsButton);
+        p.add(fewerColsButton);
+    }
+
     /**
-     * Increment the index and return the new value. Synchronization makes sure
-     * no image index is sent twice.
+     * Increment the index and return the new value. Synchronization makes
+     * sure no image index is sent twice.
      *
      * @return the image index that the thread must render.
      */
@@ -148,7 +176,12 @@ public class BlenderParallelRendering {
 
                     int renderedImageIndex = Integer.valueOf(fromClient.split(" ")[3]);
 
-                    display.update(renderedImageIndex, clientPort);
+                    if (USING_ARRAY) {
+                        System.out.println("IMAGE_INDEX: " + (IMAGE_INDEX - 1));
+                        display.update(IMAGE_INDEX - 1, clientPort, true);
+                    } else {
+                        display.update(renderedImageIndex, clientPort);
+                    }
 
                     System.out.println(getETA());
 
