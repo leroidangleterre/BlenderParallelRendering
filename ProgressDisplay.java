@@ -19,7 +19,7 @@ public class ProgressDisplay extends JPanel {
 
     // This tab represents the distribution of the clients that rendered the images.
     // It contains the id of the client, or -1 if the image was not rendered yet.
-    int[] clientPortTab;
+    String[] clientPortTab;
     private HashMap<String, Color> colors;
     private ArrayList<Color> availableColors;
     int firstImageIndex; // The index of the image represented by the first slot in indexTab[]
@@ -41,9 +41,9 @@ public class ProgressDisplay extends JPanel {
         availableColors.add(Color.green);
         availableColors.add(Color.cyan);
 
-        clientPortTab = new int[nbImages];
+        clientPortTab = new String[nbImages];
         for (int i = 0; i < nbImages; i++) {
-            clientPortTab[i] = -1;
+            clientPortTab[i] = "-1";
         }
 
         firstImageIndex = firstImageIndexParam;
@@ -66,9 +66,10 @@ public class ProgressDisplay extends JPanel {
      * @param renderedImageIndex the index of the image, starting from ZERO
      * (i.e. if we render images 3255 through 3265, then values range from 0 to
      * 10);
-     * @param clientPort the id of the client that rendered said image.
+     * @param clientAddress the id of the client that rendered said image.
+     * @param useArray
      */
-    public void update(int renderedImageIndex, int clientPort, boolean useArray) {
+    public void update(int renderedImageIndex, String clientAddress, boolean useArray) {
 
         // The image 'renderedImageIndex' is represented by the slot 'renderedImageIndex - firstImageIndex'
         // in indexTab;
@@ -76,14 +77,16 @@ public class ProgressDisplay extends JPanel {
         if (useArray) {
             index = renderedImageIndex;
         } else {
-            index = renderedImageIndex - firstImageIndex - 1;
+            index = renderedImageIndex - firstImageIndex;
         }
+        String[] split = clientAddress.split("\\.");
+        String clientPort = split[0] + "." + split[1];
         clientPortTab[index] = clientPort;
         repaint();
     }
 
-    public void update(int renderedImageIndex, int clientPort) {
-        update(renderedImageIndex, clientPort, false);
+    public void update(int renderedImageIndex, String clientAddress) {
+        update(renderedImageIndex, clientAddress, false);
     }
 
     private void paintOneSquare(int imageIndex, int squareWidth, Graphics g) {
@@ -91,7 +94,7 @@ public class ProgressDisplay extends JPanel {
         int col = imageIndex - line * nbColumns;
         int x = col * squareWidth;
         int y = line * squareWidth;
-        int client = clientPortTab[imageIndex];
+        String client = clientPortTab[imageIndex];
         Color color = chooseColor(client);
         g.setColor(color);
         g.fillRect(x, y, squareWidth, squareWidth);
@@ -100,7 +103,7 @@ public class ProgressDisplay extends JPanel {
         int paintedIndex = (useArray ? imageIndex : imageIndex + firstImageIndex);
         g.drawString(paintedIndex + "", x + 2, y - 1 + squareWidth);
         // Paint the client id
-        if (client != -1) {
+        if (!client.equals("-1")) {
             g.drawString(client + "", x + 2, y - 1 + squareWidth / 2);
         }
 
@@ -124,18 +127,18 @@ public class ProgressDisplay extends JPanel {
         }
     }
 
-    private Color chooseColor(int client) {
+    private Color chooseColor(String client) {
 
         // The color used for this client
         Color color;
 
-        if (client != -1 && !colors.containsKey(client + "")) {
+        if (!client.equals("-1") && !colors.containsKey(client + "")) {
             // Choose a new color for this new client. That color will no longer be available for other clients.
             Color newColor = availableColors.remove(0);
             colors.put(client + "", newColor);
         }
 
-        if (client == -1) {
+        if (client.equals("-1")) {
             color = Color.black;
         } else {
             color = colors.get(client + "");

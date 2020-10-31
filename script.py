@@ -52,7 +52,7 @@ try:
             bpy.ops.render.render(write_still = True)
             
             # Send reply to server
-            stringToSend = "client " + localIP + " rendered " + str(imageIndex) + "\n"
+            stringToSend = "client " + clientNumber + ", " + localIP + " rendered " + str(imageIndex) + "\n"
             s.send(stringToSend.encode())
 
 except ConnectionResetError as e:

@@ -22,7 +22,7 @@ import javax.swing.JPanel;
  */
 public class BlenderParallelRendering {
 
-    public static int START_IMAGE_INDEX = 3456;
+    public static int START_IMAGE_INDEX = 4032;
     public static int IMAGE_INDEX = START_IMAGE_INDEX;
     public static final int MAX_IMAGE_INDEX = 4855;
     public static boolean USING_ARRAY = false;
@@ -124,11 +124,14 @@ public class BlenderParallelRendering {
         // One more image is being processed.
         nbImagesDone++; // TODO: this should be done when an image is confirmed.
 
-        IMAGE_INDEX++;
+        int result;
         if (USING_ARRAY) {
-            return array[IMAGE_INDEX - 1];
+            result = array[IMAGE_INDEX];
+        } else {
+            result = IMAGE_INDEX;
         }
-        return IMAGE_INDEX;
+        IMAGE_INDEX++;
+        return result;
     }
 
     private static class ConnectionHandler implements Runnable {
@@ -172,15 +175,17 @@ public class BlenderParallelRendering {
 //                    fromClient is equal to "client 127.0.0.42 rendered 1234"
                     String clientIP = fromClient.split(" ")[1];
                     String tab[] = clientIP.split("\\.");
-                    int clientPort = Integer.valueOf(tab[3]);
+                    String clientAddress = tab[2] + "." + tab[3]; // e.g. "0.42"
+
+                    System.out.println("Client address: " + clientAddress);
 
                     int renderedImageIndex = Integer.valueOf(fromClient.split(" ")[3]);
 
                     if (USING_ARRAY) {
                         System.out.println("IMAGE_INDEX: " + (IMAGE_INDEX - 1));
-                        display.update(IMAGE_INDEX - 1, clientPort, true);
+                        display.update(IMAGE_INDEX - 1, clientAddress, true);
                     } else {
-                        display.update(renderedImageIndex, clientPort);
+                        display.update(renderedImageIndex, clientAddress);
                     }
 
                     System.out.println(getETA());
