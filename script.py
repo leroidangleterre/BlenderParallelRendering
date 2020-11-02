@@ -1,14 +1,15 @@
-# Test script for parallel rendering
+# Python script for parallel rendering
 
 import bpy
 import socket
 import time
+from time import sleep
 
 scene = bpy.context.scene
 initFilepath = scene.render.filepath # remember the current output path
 
 port = 65432
-address = '192.168.1.88'
+address = '192.168.1.42'
 
 print("START ----------------------------------------------")
 
@@ -26,6 +27,7 @@ try:
     while(loop):
 
         # Read from the server
+        print("ready to read from server")
         data = s.recv(1000).decode()
         if (data.find("END") >= 0):
             # end detected.
@@ -33,10 +35,12 @@ try:
             print("Detecting end")
 
         elif (clientNumber==-1 and data.find("Node") >= 0):
+            print("Receiving clientNumber from server")
             clientNumber = data.split(" ")[1]
             clientNumber.replace("\n", "")
 
         else:
+            print("Receiving image id")
             imageIndex = data.split(" ")[1]
             imageIndex.replace("\n", "")
             
@@ -54,6 +58,8 @@ try:
             # Send reply to server
             stringToSend = "client " + clientNumber + ", " + localIP + " rendered " + str(imageIndex) + "\n"
             s.send(stringToSend.encode())
+        print("end of read loop")
+
 
 except ConnectionResetError as e:
     print("Connection reset by server.")

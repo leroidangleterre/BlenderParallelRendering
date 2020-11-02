@@ -22,15 +22,12 @@ import javax.swing.JPanel;
  */
 public class BlenderParallelRendering {
 
-    public static int START_IMAGE_INDEX = 4032;
+    public static int START_IMAGE_INDEX = 3456;
     public static int IMAGE_INDEX = START_IMAGE_INDEX;
     public static final int MAX_IMAGE_INDEX = 4855;
     public static boolean USING_ARRAY = false;
-    public static final int[] array = {
-        4487, 4496, 4503, 4504, 4511, 4513, 4520, 4523,
-        4528, 4535, 4537, 4545, 4547, 4553, 4559, 4562, 4569, 4572, 4577, 4583,
-        4585, 4592, 4594, 4600, 4602, 4610, 4617, 4625, 4632, 4639, 4646, 4652,
-        4660, 4668, 4676, 4683, 4690, 4698, 4706, 4713, 4714, 4856};
+    public static int IMAGE_INDEX_IN_ARRAY;
+    public static final int[] array = {3826, 3827, 3828, 3829, 3830, 3831, 3832, 3833, 3834, 3835, 3836, 3837, 3838, 3839, 3840, 3841, 3842, 3843, 3844, 3845, 3846, 3847, 3848, 3849, 3850, 3851, 3852, 3853, 3854, 3855, 3856, 3857, 3858, 3859, 3860, 3861, 3862, 3863, 3864, 3865, 3866, 3867, 3868, 3869, 3870, 3871, 3872, 3873, 3874, 3875, 3876, 3877, 3878, 3879, 3880, 3881, 3882, 3883, 3884, 3885, 3886, 3887, 3888, 3889, 3890, 3891, 3892, 3893, 3894, 3895, 3896, 3897, 3898, 3899, 3900, 3901, 3902, 3903, 3904, 3905, 3906, 3907, 3908, 3909, 3910, 3911, 3912, 3913, 3914, 3915, 3916, 3917, 3918, 3919, 3920, 3921, 3922, 3923, 3924, 3925, 3926, 3927, 3928, 3929, 3930, 3931, 3932, 3933, 3934, 3935, 3936, 3937, 3938, 3939, 3940, 3941, 3942, 3943, 3944, 3945, 3946, 3947, 3948, 3949, 3950, 3951, 3952, 3953, 3954, 3971, 3987, 4280, 4291, 4348, 4547, 4548};
 
     public static int NODE_NUMBER = 0;
 
@@ -74,13 +71,15 @@ public class BlenderParallelRendering {
         window.setSize(new Dimension(width, height));
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        display = new ProgressDisplay(nbImagesNeeded, START_IMAGE_INDEX, USING_ARRAY);
+        display = new ProgressDisplay(nbImagesNeeded, USING_ARRAY);
 
         display.setPreferredSize(new Dimension(width, height));
         display.setSize(new Dimension(width, height));
 
         if (!USING_ARRAY) {
             display.setFirstImageIndex(START_IMAGE_INDEX);
+        } else {
+            display.setAllIndices(array);
         }
 
         window.setLayout(new BorderLayout());
@@ -114,8 +113,8 @@ public class BlenderParallelRendering {
     }
 
     /**
-     * Increment the index and return the new value. Synchronization makes
-     * sure no image index is sent twice.
+     * Increment the index and return the new value. Synchronization makes sure
+     * no image index is sent twice.
      *
      * @return the image index that the thread must render.
      */
@@ -166,29 +165,23 @@ public class BlenderParallelRendering {
 
                 while (loop) {
                     int index = getNextImageIndex();
+                    display.update(index, NODE_NUMBER + "", false);
                     outputLine = "server_asks_for " + index;
                     out.println(outputLine);
+
+                    // Receive reply from client
                     do {
                         fromClient = in.readLine();
                     } while (fromClient.isEmpty());
 
-//                    fromClient is equal to "client 127.0.0.42 rendered 1234"
-                    String clientIP = fromClient.split(" ")[1];
+                    // fromClient has the format "client 3, 127.0.0.42 rendered 1234"
+                    String clientIP = fromClient.split(" ")[2];
                     String tab[] = clientIP.split("\\.");
                     String clientAddress = tab[2] + "." + tab[3]; // e.g. "0.42"
 
-                    System.out.println("Client address: " + clientAddress);
+                    display.update(index, clientAddress, true);
 
-                    int renderedImageIndex = Integer.valueOf(fromClient.split(" ")[3]);
-
-                    if (USING_ARRAY) {
-                        System.out.println("IMAGE_INDEX: " + (IMAGE_INDEX - 1));
-                        display.update(IMAGE_INDEX - 1, clientAddress, true);
-                    } else {
-                        display.update(renderedImageIndex, clientAddress);
-                    }
-
-                    System.out.println(getETA());
+                    System.out.println("Client : " + clientAddress + "; " + getETA());
 
                     if (nbImagesDone >= nbImagesNeeded) {
                         loop = false;

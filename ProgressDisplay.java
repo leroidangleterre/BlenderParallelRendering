@@ -20,9 +20,9 @@ public class ProgressDisplay extends JPanel {
     // This tab represents the distribution of the clients that rendered the images.
     // It contains the id of the client, or -1 if the image was not rendered yet.
     String[] clientPortTab;
-    private HashMap<String, Color> colors;
-    private ArrayList<Color> availableColors;
-    int firstImageIndex; // The index of the image represented by the first slot in indexTab[]
+    int[] imageIndexTab;
+    private final HashMap<String, Color> colors;
+    private final ArrayList<Color> availableColors;
 
     int nbLines, nbColumns;
     int newHeight;
@@ -30,7 +30,10 @@ public class ProgressDisplay extends JPanel {
     int currentIndex;
     boolean useArray;
 
-    public ProgressDisplay(int nbImages, int firstImageIndexParam, boolean useArrayParam) {
+    private static final String NOT_STARTED = "NOT_STARTED";
+    private static final String NOT_FINISHED = "NOT_FINISHED";
+
+    public ProgressDisplay(int nbImages, boolean useArrayParam) {
 
         // Hashmap key: string value of client; value: allocated color.
         colors = new HashMap<>();
@@ -42,11 +45,11 @@ public class ProgressDisplay extends JPanel {
         availableColors.add(Color.cyan);
 
         clientPortTab = new String[nbImages];
+        imageIndexTab = new int[nbImages];
         for (int i = 0; i < nbImages; i++) {
-            clientPortTab[i] = "-1";
+            clientPortTab[i] = NOT_STARTED;
+            imageIndexTab[i] = -1;
         }
-
-        firstImageIndex = firstImageIndexParam;
 
         nbColumns = (int) Math.sqrt(clientPortTab.length);
         nbLines = clientPortTab.length / nbColumns;
@@ -67,26 +70,34 @@ public class ProgressDisplay extends JPanel {
      * (i.e. if we render images 3255 through 3265, then values range from 0 to
      * 10);
      * @param clientAddress the id of the client that rendered said image.
-     * @param useArray
+     * @param finished true when the image is confirmed done, false when it is
+     * still being computed.
      */
-    public void update(int renderedImageIndex, String clientAddress, boolean useArray) {
+    public void update(int renderedImageIndex, String clientAddress, boolean finished) {
 
-        // The image 'renderedImageIndex' is represented by the slot 'renderedImageIndex - firstImageIndex'
-        // in indexTab;
-        int index;
-        if (useArray) {
-            index = renderedImageIndex;
-        } else {
-            index = renderedImageIndex - firstImageIndex;
-        }
+        String clientPort;
+
         String[] split = clientAddress.split("\\.");
-        String clientPort = split[0] + "." + split[1];
-        clientPortTab[index] = clientPort;
+        if (finished) {
+            clientPort = split[0] + "." + split[1];
+        } else {
+            clientPort = NOT_FINISHED;
+        }
+        int rank = findRankOfImage(renderedImageIndex);
+        clientPortTab[rank] = clientPort;
         repaint();
     }
 
-    public void update(int renderedImageIndex, String clientAddress) {
-        update(renderedImageIndex, clientAddress, false);
+    private int findRankOfImage(int imageNumber) {
+        int rank = 0;
+        while (rank <= imageIndexTab.length && imageIndexTab[rank] != imageNumber) {
+            rank++;
+        }
+        if (rank == imageIndexTab.length) {
+            return 0;
+        } else {
+            return rank;
+        }
     }
 
     private void paintOneSquare(int imageIndex, int squareWidth, Graphics g) {
@@ -100,14 +111,14 @@ public class ProgressDisplay extends JPanel {
         g.fillRect(x, y, squareWidth, squareWidth);
         // Paint image index, which is either the actual number of the image (not necessarily starting at zero), or the rank in the array.
         g.setColor(Color.gray);
-        int paintedIndex = (useArray ? imageIndex : imageIndex + firstImageIndex);
+        int paintedIndex = (useArray ? imageIndex : imageIndex + imageIndexTab[0]);
         g.drawString(paintedIndex + "", x + 2, y - 1 + squareWidth);
-        // Paint the client id
-        if (!client.equals("-1")) {
+        // Paint the client id if the image is done
+        if (!client.equals(NOT_STARTED) && !client.equals(NOT_FINISHED)) {
             g.drawString(client + "", x + 2, y - 1 + squareWidth / 2);
         }
 
-        // Paint the borderr of the square
+        // Paint the border of the square
         g.setColor(Color.gray);
         g.drawRect(x, y, squareWidth, squareWidth);
     }
@@ -132,17 +143,20 @@ public class ProgressDisplay extends JPanel {
         // The color used for this client
         Color color;
 
-        if (!client.equals("-1") && !colors.containsKey(client + "")) {
-            // Choose a new color for this new client. That color will no longer be available for other clients.
-            Color newColor = availableColors.remove(0);
-            colors.put(client + "", newColor);
-        }
-
-        if (client.equals("-1")) {
+        if (client.equals(NOT_STARTED)) {
+            // Image not allocated.
             color = Color.black;
+        } else if (client.equals(NOT_FINISHED)) {
+            // Image being computed
+            color = Color.gray;
+        } else if (!colors.containsKey(client + "")) {
+            // A new client rendered its first image
+            color = availableColors.remove(0);
+            colors.put(client + "", color);
         } else {
             color = colors.get(client + "");
         }
+
         return color;
     }
 
@@ -174,7 +188,22 @@ public class ProgressDisplay extends JPanel {
         repaint();
     }
 
-    public void setFirstImageIndex(int newIndex) {
-        firstImageIndex = newIndex;
+    /**
+     * When doing a sequence, set all the indices with a step of 1.
+     *
+     * @param firstImageIndex
+     */
+    public void setFirstImageIndex(int firstImageIndex) {
+        for (int i = 0; i < imageIndexTab.length; i++) {
+            imageIndexTab[i] = firstImageIndex + i;
+        }
+    }
+
+    /**
+     * When doing a list of images (non-sequential), set the indices.
+     *
+     */
+    public void setAllIndices(int[] array) {
+        imageIndexTab = array;
     }
 }
