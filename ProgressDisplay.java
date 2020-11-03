@@ -20,6 +20,7 @@ public class ProgressDisplay extends JPanel {
     // This tab represents the distribution of the clients that rendered the images.
     // It contains the id of the client, or -1 if the image was not rendered yet.
     String[] clientPortTab;
+    String latestClient;
     int[] imageIndexTab;
     private final HashMap<String, Color> colors;
     private final ArrayList<Color> availableColors;
@@ -32,6 +33,7 @@ public class ProgressDisplay extends JPanel {
 
     private static final String NOT_STARTED = "NOT_STARTED";
     private static final String NOT_FINISHED = "NOT_FINISHED";
+    private static final String PROBABLY = "probably";
 
     public ProgressDisplay(int nbImages, boolean useArrayParam) {
 
@@ -80,8 +82,11 @@ public class ProgressDisplay extends JPanel {
         String[] split = clientAddress.split("\\.");
         if (finished) {
             clientPort = split[0] + "." + split[1];
+            // remember clientPort as the latest client
+            latestClient = clientPort;
         } else {
-            clientPort = NOT_FINISHED;
+            // This is probably the client who rendered the latest image before this one.
+            clientPort = latestClient + PROBABLY;
         }
         int rank = findRankOfImage(renderedImageIndex);
         clientPortTab[rank] = clientPort;
@@ -108,13 +113,31 @@ public class ProgressDisplay extends JPanel {
         String client = clientPortTab[imageIndex];
         Color color = chooseColor(client);
         g.setColor(color);
-        g.fillRect(x, y, squareWidth, squareWidth);
+
+        if (client.contains(PROBABLY)) {
+            // paint half square with the client's color
+            int xTab[] = {x, x + squareWidth, x};
+            int yTab[] = {y, y, y + squareWidth};
+            g.fillPolygon(xTab, yTab, 3);
+            // Paint the rest black
+            xTab[0] = x + squareWidth;
+            yTab[0] = y + squareWidth;
+            g.setColor(Color.black);
+            g.fillPolygon(xTab, yTab, 3);
+        } else {
+            // paint full square
+            g.fillRect(x, y, squareWidth, squareWidth);
+        }
+
         // Paint image index, which is either the actual number of the image (not necessarily starting at zero), or the rank in the array.
         g.setColor(Color.gray);
         int paintedIndex = (useArray ? imageIndex : imageIndex + imageIndexTab[0]);
         g.drawString(paintedIndex + "", x + 2, y - 1 + squareWidth);
         // Paint the client id if the image is done
         if (!client.equals(NOT_STARTED) && !client.equals(NOT_FINISHED)) {
+            if (client.contains(PROBABLY)) {
+                client = client.substring(0, client.length() - PROBABLY.length());
+            }
             g.drawString(client + "", x + 2, y - 1 + squareWidth / 2);
         }
 
@@ -146,6 +169,10 @@ public class ProgressDisplay extends JPanel {
         if (client.equals(NOT_STARTED)) {
             // Image not allocated.
             color = Color.black;
+        } else if (client.contains(PROBABLY)) {
+            // Not exactly sure about which client it is, but it's very likely.
+            String probableClient = client.substring(0, client.length() - PROBABLY.length());
+            color = colors.get(probableClient);
         } else if (client.equals(NOT_FINISHED)) {
             // Image being computed
             color = Color.gray;

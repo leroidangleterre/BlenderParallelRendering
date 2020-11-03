@@ -12,6 +12,8 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -24,7 +26,7 @@ public class BlenderParallelRendering {
 
     public static int START_IMAGE_INDEX = 3456;
     public static int IMAGE_INDEX = START_IMAGE_INDEX;
-    public static final int MAX_IMAGE_INDEX = 4855;
+    public static final int MAX_IMAGE_INDEX = 4915;
     public static boolean USING_ARRAY = false;
     public static int IMAGE_INDEX_IN_ARRAY;
     public static final int[] array = {3826, 3827, 3828, 3829, 3830, 3831, 3832, 3833, 3834, 3835, 3836, 3837, 3838, 3839, 3840, 3841, 3842, 3843, 3844, 3845, 3846, 3847, 3848, 3849, 3850, 3851, 3852, 3853, 3854, 3855, 3856, 3857, 3858, 3859, 3860, 3861, 3862, 3863, 3864, 3865, 3866, 3867, 3868, 3869, 3870, 3871, 3872, 3873, 3874, 3875, 3876, 3877, 3878, 3879, 3880, 3881, 3882, 3883, 3884, 3885, 3886, 3887, 3888, 3889, 3890, 3891, 3892, 3893, 3894, 3895, 3896, 3897, 3898, 3899, 3900, 3901, 3902, 3903, 3904, 3905, 3906, 3907, 3908, 3909, 3910, 3911, 3912, 3913, 3914, 3915, 3916, 3917, 3918, 3919, 3920, 3921, 3922, 3923, 3924, 3925, 3926, 3927, 3928, 3929, 3930, 3931, 3932, 3933, 3934, 3935, 3936, 3937, 3938, 3939, 3940, 3941, 3942, 3943, 3944, 3945, 3946, 3947, 3948, 3949, 3950, 3951, 3952, 3953, 3954, 3971, 3987, 4280, 4291, 4348, 4547, 4548};
@@ -211,9 +213,19 @@ public class BlenderParallelRendering {
 
             int estimatedRemainingMillisec = averageMillisec * nbRemainingImages;
 
-            String result = "Elapsed: " + elapsedMillisec / 1000 + " s, "
-                    + "remaining: " + estimatedRemainingMillisec / 1000 + " s; "
-                    + "est. total: " + (elapsedMillisec + estimatedRemainingMillisec) / 1000 + " s "
+            String elapsed = convertSecToHMS((int) (elapsedMillisec / 1000));
+            String estimatedRemaining = convertSecToHMS(estimatedRemainingMillisec / 1000);
+            String estimatedTotal = convertSecToHMS((int) ((elapsedMillisec + estimatedRemainingMillisec) / 1000));
+
+            String result = "";
+
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm:ss z");
+            Date completionDate = new Date(System.currentTimeMillis() + estimatedRemainingMillisec);
+
+            result += "Elapsed: " + elapsed
+                    + " remaining: " + estimatedRemaining
+                    //                    + "est. total: " + estimatedTotal + " s "
+                    + " ETC: " + completionDate
                     + "; Average: ";
             if (averageMillisec > 10000) {
                 result += averageMillisec / 1000 + " s/i; ";
@@ -227,7 +239,14 @@ public class BlenderParallelRendering {
         }
     }
 
-    private static String getHMS(int nbSec) {
+    /**
+     * Convert an amount of seconds to hours, minutes and seconds, and give the
+     * result as a string formatted as "h:m:s"
+     *
+     * @param nbSec
+     * @return a string representing that duration as hours, minutes and seconds
+     */
+    private static String convertSecToHMS(int nbSec) {
         String result = "";
         int nbHours = nbSec / 3600;
         if (nbHours > 0) {
