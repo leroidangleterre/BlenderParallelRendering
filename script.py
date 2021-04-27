@@ -4,12 +4,14 @@ import bpy
 import socket
 import time
 from time import sleep
+import io
+import uuid
 
 scene = bpy.context.scene
-initFilepath = scene.render.filepath # remember the current output path
+
 
 port = 65432
-address = '192.168.1.42'
+address = '192.168.1.39'
 
 print("START ----------------------------------------------")
 
@@ -18,9 +20,36 @@ print("hostname: "+localhostName)
 localIP = socket.gethostbyname(localhostName)
 print("local ip: "+localIP)
 
+macAddress = hex(uuid.getnode())
+print("Mac Address: " + macAddress)
+
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((address, port))
-clientNumber = -1
+
+
+# TODO: run the Java process that watches the rendered images directory.
+
+
+
+def endsWithDigit(text):
+    lastChar = text[len(text)-1]
+    if('0' <= lastChar and lastChar <= '9'):
+        return True
+    else:
+        return False
+
+
+
+# remember the current output path, especially if the client is relaunched.
+while(endsWithDigit(scene.render.filepath)):
+    length = len(scene.render.filepath)
+    initFilepath = scene.render.filepath[0:length-1]
+    print("trimmed filepath: " + initFilepath)
+    scene.render.filepath = initFilepath
+
+
+initFilepath = scene.render.filepath
+
 
 try:
     loop = True
@@ -29,18 +58,15 @@ try:
         # Read from the server
         print("ready to read from server")
         data = s.recv(1000).decode()
+        
         if (data.find("END") >= 0):
             # end detected.
             loop = False
             print("Detecting end")
 
-        elif (clientNumber==-1 and data.find("Node") >= 0):
-            print("Receiving clientNumber from server")
-            clientNumber = data.split(" ")[1]
-            clientNumber.replace("\n", "")
-
         else:
             print("Receiving image id")
+            print("String received from server: \"" + data + "\"")
             imageIndex = data.split(" ")[1]
             imageIndex.replace("\n", "")
             
@@ -56,8 +82,13 @@ try:
             bpy.ops.render.render(write_still = True)
             
             # Send reply to server
-            stringToSend = "client " + clientNumber + ", " + localIP + " rendered " + str(imageIndex) + "\n"
-            s.send(stringToSend.encode())
+            stringToSend = "client " + macAddress + " , " + localIP + " rendered " + str(imageIndex) + "\n"
+            encodedString = stringToSend.encode()
+            print("Init string: <" + stringToSend + ">, encoded: <" + str(encodedString) + ">")
+            s.send(encodedString)
+
+            # Images shall remain on the clients until manually deleted.
+
         print("end of read loop")
 
 
@@ -68,3 +99,5 @@ except ConnectionResetError as e:
 scene.render.filepath = initFilepath
 
 print("program terminated.")
+
+

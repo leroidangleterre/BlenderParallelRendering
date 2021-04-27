@@ -24,12 +24,12 @@ import javax.swing.JPanel;
  */
 public class BlenderParallelRendering {
 
-    public static int START_IMAGE_INDEX = 4255;
+    public static final int START_IMAGE_INDEX = 1;
     public static int IMAGE_INDEX = START_IMAGE_INDEX;
-    public static final int MAX_IMAGE_INDEX = 4650;
+    public static final int MAX_IMAGE_INDEX = 2395;
     public static boolean USING_ARRAY = false;
     public static int IMAGE_INDEX_IN_ARRAY;
-    public static final int[] array = {3826, 3827, 3828, 3829, 3830, 3831, 3832, 3833, 3834, 3835, 3836, 3837, 3838, 3839, 3840, 3841, 3842, 3843, 3844, 3845, 3846, 3847, 3848, 3849, 3850, 3851, 3852, 3853, 3854, 3855, 3856, 3857, 3858, 3859, 3860, 3861, 3862, 3863, 3864, 3865, 3866, 3867, 3868, 3869, 3870, 3871, 3872, 3873, 3874, 3875, 3876, 3877, 3878, 3879, 3880, 3881, 3882, 3883, 3884, 3885, 3886, 3887, 3888, 3889, 3890, 3891, 3892, 3893, 3894, 3895, 3896, 3897, 3898, 3899, 3900, 3901, 3902, 3903, 3904, 3905, 3906, 3907, 3908, 3909, 3910, 3911, 3912, 3913, 3914, 3915, 3916, 3917, 3918, 3919, 3920, 3921, 3922, 3923, 3924, 3925, 3926, 3927, 3928, 3929, 3930, 3931, 3932, 3933, 3934, 3935, 3936, 3937, 3938, 3939, 3940, 3941, 3942, 3943, 3944, 3945, 3946, 3947, 3948, 3949, 3950, 3951, 3952, 3953, 3954, 3971, 3987, 4280, 4291, 4348, 4547, 4548};
+    public static final int[] array = {417, 426};
 
     public static int NODE_NUMBER = 0;
 
@@ -40,7 +40,7 @@ public class BlenderParallelRendering {
     public static int nbClientsConnected = 0;
 
     private static JFrame window;
-    private static int width = 1000, height = 1000;
+    private static int width = 1000, height = 800;
     private static ProgressDisplay display;
     private static AverageCalculator avgCalc;
 
@@ -175,33 +175,35 @@ public class BlenderParallelRendering {
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 String outputLine;
 
-                // Tell the client what its number is.
-                out.println("Node " + NODE_NUMBER + " ");
+                String clientAddress = NODE_NUMBER + "";
                 NODE_NUMBER++;
-
                 boolean loop = true;
 
                 while (loop) {
                     int index = getNextImageIndex();
-                    display.update(index, NODE_NUMBER + "", false);
+                    display.update(index, clientAddress + "", false);
                     outputLine = "server_asks_for " + index;
+                    System.out.println("Server_asks_for_image " + index);
                     out.println(outputLine);
 
                     // Receive reply from client
                     do {
                         fromClient = in.readLine();
+//                        System.out.println("line received from client: <" + fromClient + ">");
+                        if (fromClient.contains("client")) {
+                            // fromClient has the format "client 0x123456789, 127.0.0.42 rendered 1234"
+                            clientAddress = fromClient.split(" ")[1];
+//                            System.out.println("Client address:<" + clientAddress + ">");
+                        }
                     } while (fromClient.isEmpty());
-
-                    // fromClient has the format "client 3, 127.0.0.42 rendered 1234"
-                    String clientIP = fromClient.split(" ")[2];
-                    String tab[] = clientIP.split("\\.");
-                    String clientAddress = tab[2] + "." + tab[3]; // e.g. "0.42"
 
                     display.update(index, clientAddress, true);
 
                     avgCalc.add((int) System.currentTimeMillis());
 
-                    System.out.println("Client : " + clientAddress + "; " + getETA());
+                    String eta = getETA();
+                    System.out.println("Client " + clientAddress + " frame " + index + " " + eta);
+                    window.setTitle(eta);
 
                     if (nbImagesDone >= nbImagesNeeded) {
                         loop = false;
@@ -242,7 +244,7 @@ public class BlenderParallelRendering {
 
             result += "Elapsed: " + elapsed
                     + " remaining: " + estimatedRemaining
-                    //                    + "est. total: " + estimatedTotal + " s "
+                    + "est. total: " + estimatedTotal + " s "
                     + " ETC: " + completionDate
                     + "; Average: ";
             if (averageMillisec > 10000) {
@@ -254,6 +256,21 @@ public class BlenderParallelRendering {
             result += nbRemainingImages + " remaining images";
 
             return result;
+        }
+
+        private void receiveImageFromClient(int index, BufferedReader input) {
+            System.out.println("Receiving image " + index + " from client");
+            try {
+                // Receive reply from client
+                do {
+                    System.out.println("Reading line");
+                    fromClient = input.readLine();
+                    System.out.println("Read " + fromClient);
+                } while (fromClient.isEmpty());
+                System.out.println("Image received.");
+            } catch (IOException e) {
+                System.out.println("Error in receiving image");
+            }
         }
     }
 

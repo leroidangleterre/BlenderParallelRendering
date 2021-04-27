@@ -1,0 +1,19 @@
+TODO:
+1 Allow click on an unfinished tile to abort, remove it, then add it to the end of the list.
+2 Save in a text file the indices of images already rendered, and which machine did it; save the first and last indices.
+3 Load index file (cf 2) 
+
+
+
+
+
+CLIP:
+
+1 Ship animation: replace curve with animation like camera
+2 Change lighting to show screen fragments after cam U-turn
+3 Change lights when torus gets fully visible
+4 Synchronize music at end of clip
+
+
+5 Smooth the main torus
+	6 improve texture detail on initial tower

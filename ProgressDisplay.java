@@ -7,6 +7,8 @@ package blenderparallelrendering;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.util.ArrayList;
 import java.util.HashMap;
 import javax.swing.JPanel;
@@ -15,7 +17,7 @@ import javax.swing.JPanel;
  *
  * @author arthurmanoha
  */
-public class ProgressDisplay extends JPanel {
+public class ProgressDisplay extends JPanel implements MouseWheelListener {
 
     // This tab represents the distribution of the clients that rendered the images.
     // It contains the id of the client, or -1 if the image was not rendered yet.
@@ -35,6 +37,8 @@ public class ProgressDisplay extends JPanel {
     private static final String NOT_FINISHED = "NOT_FINISHED";
     private static final String PROBABLY = "probably";
 
+    private int displayOffset = 0;
+
     public ProgressDisplay(int nbImages, boolean useArrayParam) {
 
         // Hashmap key: string value of client; value: allocated color.
@@ -53,14 +57,16 @@ public class ProgressDisplay extends JPanel {
             imageIndexTab[i] = -1;
         }
 
-        nbColumns = (int) Math.sqrt(clientPortTab.length);
+        nbColumns = 20;
         nbLines = clientPortTab.length / nbColumns;
-        if (nbColumns * nbColumns != clientPortTab.length) {
+        if (nbColumns * nbLines != clientPortTab.length) {
             // Not a perfect square, need to add a line.
             nbLines++;
         }
 
         computeHeight();
+
+        this.addMouseWheelListener(this);
 
         repaint();
     }
@@ -71,7 +77,8 @@ public class ProgressDisplay extends JPanel {
      * @param renderedImageIndex the index of the image, starting from ZERO
      * (i.e. if we render images 3255 through 3265, then values range from 0 to
      * 10);
-     * @param clientAddress the id of the client that rendered said image.
+     * @param clientAddress the id of the client that rendered said image;
+     * format: 0x123456...
      * @param finished true when the image is confirmed done, false when it is
      * still being computed.
      */
@@ -79,9 +86,8 @@ public class ProgressDisplay extends JPanel {
 
         String clientPort;
 
-        String[] split = clientAddress.split("\\.");
         if (finished) {
-            clientPort = split[0] + "." + split[1];
+            clientPort = clientAddress.substring(0, 5);
             // remember clientPort as the latest client
             latestClient = clientPort;
         } else {
@@ -109,7 +115,7 @@ public class ProgressDisplay extends JPanel {
         int line = imageIndex / nbColumns;
         int col = imageIndex - line * nbColumns;
         int x = col * squareWidth;
-        int y = line * squareWidth;
+        int y = (line + displayOffset) * squareWidth;
         String client = clientPortTab[imageIndex];
         Color color = chooseColor(client);
         g.setColor(color);
@@ -229,8 +235,19 @@ public class ProgressDisplay extends JPanel {
     /**
      * When doing a list of images (non-sequential), set the indices.
      *
+     * @param array the indices of the images we need to render
      */
     public void setAllIndices(int[] array) {
         imageIndexTab = array;
+    }
+
+    @Override
+    public void mouseWheelMoved(MouseWheelEvent e) {
+        if (e.isControlDown()) {
+            nbColumns += e.getWheelRotation();
+        } else {
+            displayOffset -= e.getWheelRotation();
+        }
+        repaint();
     }
 }
