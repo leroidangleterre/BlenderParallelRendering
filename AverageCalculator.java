@@ -43,7 +43,12 @@ public class AverageCalculator {
 
         int duration = currentDateInMs - dateList.get(0);
         int nbPoints = dateList.size();
-        int average = duration / (dateList.size() - 1);
+        int average;
+        if (dateList.size() <= 1) {
+            average = 0;
+        } else {
+            average = duration / (dateList.size() - 1);
+        }
 
         return average;
     }

@@ -9,11 +9,27 @@ TODO:
 
 CLIP:
 
-1 Ship animation: replace curve with animation like camera
-2 Change lighting to show screen fragments after cam U-turn
+TODO
+9 Change cam movement at 2121
+10 Frame 2300, check initial tower movement
+8 Add engine sound at end of music
 3 Change lights when torus gets fully visible
-4 Synchronize music at end of clip
-
-
+2 Change lighting to show screen fragments after cam U-turn
 5 Smooth the main torus
-	6 improve texture detail on initial tower
+
+DONE
+1 Ship animation: replace curve with animation like camera
+4 Synchronize music at end of clip
+6 improve texture detail on initial tower
+7 Change the initial position of the camera so that we only see the screen and not the background
+
+
+
+
+
+2 vaisseaux
+Cri de Wilhelm
+"I have a bad feeling about this"
+Format 4/3 ?
+Missiles + fumée
+Luck dice Han Solo

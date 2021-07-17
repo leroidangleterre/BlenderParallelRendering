@@ -30,17 +30,14 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
     int nbLines, nbColumns;
     int newHeight;
 
-    int currentIndex;
-    boolean useArray;
-
     private static final String NOT_STARTED = "NOT_STARTED";
     private static final String NOT_FINISHED = "NOT_FINISHED";
     private static final String PROBABLY = "probably";
 
     private int displayOffset = 0;
 
-    public ProgressDisplay(int nbImages, boolean useArrayParam) {
-
+    // A ProgressDisplay is always created with a complete list of indices.
+    public ProgressDisplay(int[] array) {
         // Hashmap key: string value of client; value: allocated color.
         colors = new HashMap<>();
         availableColors = new ArrayList<>();
@@ -50,11 +47,12 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         availableColors.add(Color.green);
         availableColors.add(Color.cyan);
 
-        clientPortTab = new String[nbImages];
-        imageIndexTab = new int[nbImages];
-        for (int i = 0; i < nbImages; i++) {
+        clientPortTab = new String[array.length];
+        imageIndexTab = new int[array.length];
+
+        for (int i = 0; i < array.length; i++) {
             clientPortTab[i] = NOT_STARTED;
-            imageIndexTab[i] = -1;
+            imageIndexTab[i] = array[i];
         }
 
         nbColumns = 20;
@@ -99,9 +97,9 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         repaint();
     }
 
-    private int findRankOfImage(int imageNumber) {
+    protected int findRankOfImage(int imageNumber) {
         int rank = 0;
-        while (rank <= imageIndexTab.length && imageIndexTab[rank] != imageNumber) {
+        while (rank < imageIndexTab.length && imageIndexTab[rank] != imageNumber) {
             rank++;
         }
         if (rank == imageIndexTab.length) {
@@ -111,12 +109,21 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         }
     }
 
-    private void paintOneSquare(int imageIndex, int squareWidth, Graphics g) {
-        int line = imageIndex / nbColumns;
-        int col = imageIndex - line * nbColumns;
-        int x = col * squareWidth;
+    private void paintOneSquare(int squareIndex, int imageIndex, int squareWidth, int remainingPixels, Graphics g) {
+//        System.out.println("paintOneSquare; squareIndex: " + squareIndex + ", image index: " + imageIndex);
+        int line = squareIndex / nbColumns;
+        int col = squareIndex - line * nbColumns;
+        int x = col * squareWidth + (remainingPixels * col) / nbColumns;
         int y = (line + displayOffset) * squareWidth;
-        String client = clientPortTab[imageIndex];
+        String client;
+
+        if (imageIndex == -1) {
+            client = "no_client_yet";
+        } else {
+            client = clientPortTab[squareIndex];
+        }
+
+//        Color color = chooseColor(NOT_STARTED);
         Color color = chooseColor(client);
         g.setColor(color);
 
@@ -135,10 +142,9 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
             g.fillRect(x, y, squareWidth, squareWidth);
         }
 
-        // Paint image index, which is either the actual number of the image (not necessarily starting at zero), or the rank in the array.
+        // Paint image index
         g.setColor(Color.gray);
-        int paintedIndex = (useArray ? imageIndex : imageIndex + imageIndexTab[0]);
-        g.drawString(paintedIndex + "", x + 2, y - 1 + squareWidth);
+        g.drawString(imageIndex + "", x + 2, y - 1 + squareWidth);
         // Paint the client id if the image is done
         if (!client.equals(NOT_STARTED) && !client.equals(NOT_FINISHED)) {
             if (client.contains(PROBABLY)) {
@@ -161,9 +167,18 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
 
         int squareWidth = this.getWidth() / nbColumns;
 
+        // The additional pixels will be spread among the columns.
+        int remainingPixels = this.getWidth() - squareWidth * nbColumns;
+
         // Paint the squares.
-        for (int imageIndex = 0; imageIndex < clientPortTab.length; imageIndex++) {
-            paintOneSquare(imageIndex, squareWidth, g);
+        for (int squareIndex = 0; squareIndex < clientPortTab.length; squareIndex++) {
+            // The squares are numbered from zero, but the images may have different indices.
+            int imageIndex = imageIndexTab[squareIndex];
+            try {
+                paintOneSquare(squareIndex, imageIndex, squareWidth, remainingPixels, g);
+            } catch (ArrayIndexOutOfBoundsException e) {
+                System.out.println("Exception for square index " + squareIndex + ", image index: " + imageIndex);
+            }
         }
     }
 
@@ -248,6 +263,20 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         } else {
             displayOffset -= e.getWheelRotation();
         }
+        repaint();
+    }
+
+    protected void invalidateImage(int imageToReset) {
+
+        int rank = findRankOfImage(imageToReset);
+        // Shift one step to the left all the images that were after the reset image.
+        for (int index = rank; index < imageIndexTab.length - 1; index++) {
+            imageIndexTab[index] = imageIndexTab[index + 1];
+            clientPortTab[index] = clientPortTab[index + 1];
+        }
+        // Place the chosen image at the end.
+        imageIndexTab[imageIndexTab.length - 1] = imageToReset;
+        clientPortTab[clientPortTab.length - 1] = NOT_STARTED;
         repaint();
     }
 }
