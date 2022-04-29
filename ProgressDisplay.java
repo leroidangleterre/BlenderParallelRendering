@@ -21,18 +21,18 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
 
     // This tab represents the distribution of the clients that rendered the images.
     // It contains the id of the client, or -1 if the image was not rendered yet.
-    String[] clientPortTab;
-    String latestClient;
+    String[] clientAddressTab;
     int[] imageIndexTab;
+    IMAGE_STATUS[] imageStatus; // NOT_STARTED, IN_PROGESS, DONE.
+    enum IMAGE_STATUS {
+        NOT_STARTED, IN_PROGRESS, DONE
+    };
+
     private final HashMap<String, Color> colors;
     private final ArrayList<Color> availableColors;
 
     int nbLines, nbColumns;
     int newHeight;
-
-    private static final String NOT_STARTED = "NOT_STARTED";
-    private static final String NOT_FINISHED = "NOT_FINISHED";
-    private static final String PROBABLY = "probably";
 
     private int displayOffset = 0;
 
@@ -47,17 +47,19 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         availableColors.add(Color.green);
         availableColors.add(Color.cyan);
 
-        clientPortTab = new String[array.length];
+        clientAddressTab = new String[array.length];
         imageIndexTab = new int[array.length];
+        imageStatus = new IMAGE_STATUS[array.length];
 
         for (int i = 0; i < array.length; i++) {
-            clientPortTab[i] = NOT_STARTED;
+            clientAddressTab[i] = "no_address";
             imageIndexTab[i] = array[i];
+            imageStatus[i] = IMAGE_STATUS.NOT_STARTED;
         }
 
         nbColumns = 20;
-        nbLines = clientPortTab.length / nbColumns;
-        if (nbColumns * nbLines != clientPortTab.length) {
+        nbLines = clientAddressTab.length / nbColumns;
+        if (nbColumns * nbLines != clientAddressTab.length) {
             // Not a perfect square, need to add a line.
             nbLines++;
         }
@@ -70,7 +72,9 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
     }
 
     /**
-     * Tell the progress display that the n-th image has been rendered.
+     * Tell the progress display that the n-th image has been rendered or is
+     * being rendered. When the client already has an unfinished frame, it means
+     * that it just reconnected and that the previously assigned frame is lost.
      *
      * @param renderedImageIndex the index of the image, starting from ZERO
      * (i.e. if we render images 3255 through 3265, then values range from 0 to
@@ -82,19 +86,18 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
      */
     public void update(int renderedImageIndex, String clientAddress, boolean finished) {
 
-        String clientPort;
+        if (renderedImageIndex != -1) { // If computation is still ongoing
 
-        if (finished) {
-            clientPort = clientAddress.substring(0, 5);
-            // remember clientPort as the latest client
-            latestClient = clientPort;
-        } else {
-            // This is probably the client who rendered the latest image before this one.
-            clientPort = latestClient + PROBABLY;
+            int rank = findRankOfImage(renderedImageIndex);
+            clientAddressTab[rank] = clientAddress;
+            if (finished) {
+                imageStatus[rank] = IMAGE_STATUS.DONE;
+            } else {
+                imageStatus[rank] = IMAGE_STATUS.IN_PROGRESS;
+                cancelUnfinishedFrameByClient(clientAddress, renderedImageIndex);
+            }
+            repaint();
         }
-        int rank = findRankOfImage(renderedImageIndex);
-        clientPortTab[rank] = clientPort;
-        repaint();
     }
 
     protected int findRankOfImage(int imageNumber) {
@@ -109,49 +112,49 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         }
     }
 
-    private void paintOneSquare(int squareIndex, int imageIndex, int squareWidth, int remainingPixels, Graphics g) {
-//        System.out.println("paintOneSquare; squareIndex: " + squareIndex + ", image index: " + imageIndex);
+    private void paintOneSquare(int squareIndex, int frameNumber, int squareWidth, int remainingPixels, Graphics g) {
         int line = squareIndex / nbColumns;
         int col = squareIndex - line * nbColumns;
         int x = col * squareWidth + (remainingPixels * col) / nbColumns;
         int y = (line + displayOffset) * squareWidth;
         String client;
 
-        if (imageIndex == -1) {
+        if (frameNumber == -1) {
             client = "no_client_yet";
         } else {
-            client = clientPortTab[squareIndex];
+            client = clientAddressTab[squareIndex];
         }
 
-//        Color color = chooseColor(NOT_STARTED);
         Color color = chooseColor(client);
         g.setColor(color);
 
-        if (client.contains(PROBABLY)) {
+        switch (imageStatus[squareIndex]) {
+        case IN_PROGRESS:
             // paint half square with the client's color
             int xTab[] = {x, x + squareWidth, x};
             int yTab[] = {y, y, y + squareWidth};
             g.fillPolygon(xTab, yTab, 3);
-            // Paint the rest black
+            // Paint the rest gray
             xTab[0] = x + squareWidth;
             yTab[0] = y + squareWidth;
-            g.setColor(Color.black);
+            g.setColor(Color.gray.darker());
             g.fillPolygon(xTab, yTab, 3);
-        } else {
-            // paint full square
+            break;
+        case NOT_STARTED:
+            g.setColor(Color.gray.darker());
             g.fillRect(x, y, squareWidth, squareWidth);
+            break;
+        case DONE:
+            // paint full square with the client's color
+            g.setColor(color);
+            g.fillRect(x, y, squareWidth, squareWidth);
+            break;
         }
 
         // Paint image index
         g.setColor(Color.gray);
-        g.drawString(imageIndex + "", x + 2, y - 1 + squareWidth);
-        // Paint the client id if the image is done
-        if (!client.equals(NOT_STARTED) && !client.equals(NOT_FINISHED)) {
-            if (client.contains(PROBABLY)) {
-                client = client.substring(0, client.length() - PROBABLY.length());
-            }
-            g.drawString(client + "", x + 2, y - 1 + squareWidth / 2);
-        }
+        g.drawString(frameNumber + "", x + 2, y - 1 + squareWidth);
+        g.drawString(client + "", x + 2, y - 1 + squareWidth / 2);
 
         // Paint the border of the square
         g.setColor(Color.gray);
@@ -171,13 +174,13 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         int remainingPixels = this.getWidth() - squareWidth * nbColumns;
 
         // Paint the squares.
-        for (int squareIndex = 0; squareIndex < clientPortTab.length; squareIndex++) {
+        for (int i = 0; i < clientAddressTab.length; i++) {
             // The squares are numbered from zero, but the images may have different indices.
-            int imageIndex = imageIndexTab[squareIndex];
+            int frameNumber = imageIndexTab[i]; // Frame number in Blender
             try {
-                paintOneSquare(squareIndex, imageIndex, squareWidth, remainingPixels, g);
+                paintOneSquare(i, frameNumber, squareWidth, remainingPixels, g);
             } catch (ArrayIndexOutOfBoundsException e) {
-                System.out.println("Exception for square index " + squareIndex + ", image index: " + imageIndex);
+                System.out.println("Exception for square index " + i + ", image index: " + i);
             }
         }
     }
@@ -187,16 +190,9 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         // The color used for this client
         Color color;
 
-        if (client.equals(NOT_STARTED)) {
+        if (imageStatus.equals(IMAGE_STATUS.NOT_STARTED)) {
             // Image not allocated.
             color = Color.black;
-        } else if (client.contains(PROBABLY)) {
-            // Not exactly sure about which client it is, but it's very likely.
-            String probableClient = client.substring(0, client.length() - PROBABLY.length());
-            color = colors.get(probableClient);
-        } else if (client.equals(NOT_FINISHED)) {
-            // Image being computed
-            color = Color.gray;
         } else if (!colors.containsKey(client + "")) {
             // A new client rendered its first image
             color = availableColors.remove(0);
@@ -209,9 +205,8 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
     }
 
     /**
-     * Set the height to the appropriate value, given the current width of the
-     * panel.
-     *
+     * Set the height to the appropriate value, given the current width of
+     * the panel.
      */
     private void computeHeight() {
 
@@ -232,7 +227,7 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
                 nbColumns--;
             }
         }
-        nbLines = clientPortTab.length / nbColumns;
+        nbLines = clientAddressTab.length / nbColumns;
         repaint();
     }
 
@@ -272,11 +267,45 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         // Shift one step to the left all the images that were after the reset image.
         for (int index = rank; index < imageIndexTab.length - 1; index++) {
             imageIndexTab[index] = imageIndexTab[index + 1];
-            clientPortTab[index] = clientPortTab[index + 1];
+            clientAddressTab[index] = clientAddressTab[index + 1];
+            imageStatus[index] = imageStatus[index + 1];
         }
         // Place the chosen image at the end.
         imageIndexTab[imageIndexTab.length - 1] = imageToReset;
-        clientPortTab[clientPortTab.length - 1] = NOT_STARTED;
+        clientAddressTab[clientAddressTab.length - 1] = "no_address_again";
+        imageStatus[clientAddressTab.length - 1] = IMAGE_STATUS.NOT_STARTED;
         repaint();
+    }
+
+    /**
+     * Look for an image that is being rendered by this client; if such an image
+     * exists, invalidate it.
+     *
+     * @param clientAddress
+     * @param renderedImageIndex The image that is in progress; any other
+     * in-progress image marked with the same client must be cancelled.
+     */
+    private void cancelUnfinishedFrameByClient(String clientAddress, int renderedImageIndex) {
+
+        for (int rank = 0; rank < imageIndexTab.length; rank++) {
+
+            if (clientAddressTab[rank].equals(clientAddress)) {
+                // This image in the list is the responsability of this client.
+                switch (imageStatus[rank]) {
+                case IN_PROGRESS:
+                    // If that image is not the one being rendered now, then it was cancelled by the client.
+                    // It must be officially invalidated.
+                    if (imageIndexTab[rank] != renderedImageIndex) {
+                        invalidateImage(imageIndexTab[rank]);
+                    }
+                    break;
+                case NOT_STARTED:
+                    // Don't do anything, image not assigned yet.
+                    break;
+                case DONE:
+                    break;
+                }
+            }
+        }
     }
 }

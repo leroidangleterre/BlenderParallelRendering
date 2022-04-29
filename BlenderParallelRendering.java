@@ -31,18 +31,27 @@ import javax.swing.JTextField;
  */
 public class BlenderParallelRendering {
 
-    public static final int START_IMAGE_INDEX = 1;
+    public static final int START_IMAGE_INDEX = 575;
     public static int IMAGE_INDEX;
-    public static final int MAX_IMAGE_INDEX = 1200;
-    public static boolean USING_ARRAY = false;
+    public static final int MAX_IMAGE_INDEX = 595;
+    public static boolean USING_DISCRETE_LIST = false;
     public static int IMAGE_INDEX_IN_ARRAY;
-    public static int[] array = {8, 14};
+
+    // The list of image indices to render; specified at startup for individual indices,
+    // or in constructor for rendering a range of images.
+    public static int[] imageIndexArray = {442,
+        505,
+        886,
+        887,
+        1479,
+        1663};
 
     public static int NODE_NUMBER = 0;
 
     public static long startDate;
     public static int nbImagesNeeded;
     public static int nbImagesDone;
+    public static boolean keepListeningForClients = true;
 
     public static int nbClientsConnected = 0;
 
@@ -65,13 +74,13 @@ public class BlenderParallelRendering {
         startDate = System.currentTimeMillis();
 
         // When the array is used, we start counting at zero.
-        if (USING_ARRAY) {
-            nbImagesNeeded = array.length;
+        if (USING_DISCRETE_LIST) {
+            nbImagesNeeded = imageIndexArray.length;
         } else {
             // We have the first and last image indices, we create an array of consecutive indices.
-            array = new int[MAX_IMAGE_INDEX - START_IMAGE_INDEX + 1];
-            for (int indexInArray = 0; indexInArray < array.length; indexInArray++) {
-                array[indexInArray] = START_IMAGE_INDEX + indexInArray;
+            imageIndexArray = new int[MAX_IMAGE_INDEX - START_IMAGE_INDEX + 1];
+            for (int indexInArray = 0; indexInArray < imageIndexArray.length; indexInArray++) {
+                imageIndexArray[indexInArray] = START_IMAGE_INDEX + indexInArray;
             }
             nbImagesNeeded = MAX_IMAGE_INDEX - START_IMAGE_INDEX + 1;
         }
@@ -88,7 +97,7 @@ public class BlenderParallelRendering {
         window.setSize(new Dimension(width, height));
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        display = new ProgressDisplay(array);
+        display = new ProgressDisplay(imageIndexArray);
 
         display.setPreferredSize(new Dimension(width, height));
         display.setSize(new Dimension(width, height));
@@ -102,7 +111,7 @@ public class BlenderParallelRendering {
         window.add(display);
         window.setVisible(true);
 
-        while (true) {
+        while (keepListeningForClients) {
             Socket clientSocket = serverSocket.accept();
             new Thread(new ConnectionHandler(clientSocket, display)).start();
         }
@@ -168,9 +177,16 @@ public class BlenderParallelRendering {
 
         int result;
 
-        result = array[IMAGE_INDEX];
-        IMAGE_INDEX++;
-        return result;
+        try {
+            result = imageIndexArray[IMAGE_INDEX];
+            IMAGE_INDEX++;
+            return result;
+        } catch (ArrayIndexOutOfBoundsException e) {
+            // All images have been rendered, it is time to stop the server.
+            keepListeningForClients = false;
+            System.out.println("Server will now stop.");
+            return -1;
+        }
     }
 
     /**
@@ -181,17 +197,7 @@ public class BlenderParallelRendering {
      */
     private static void invalidateImage(int imageToReset) {
 
-        int rank = display.findRankOfImage(imageToReset);
-        // Shift one step to the left all the images that were after the reset image.
-        for (int index = rank; index < array.length - 1; index++) {
-            array[index] = array[index + 1];
-        }
-        // Place the chosen image at the end.
-        array[array.length - 1] = imageToReset;
         display.invalidateImage(imageToReset);
-
-        IMAGE_INDEX--;
-        nbImagesDone--;
     }
 
     private static class ConnectionHandler implements Runnable {
@@ -225,7 +231,7 @@ public class BlenderParallelRendering {
                 int bufferSize = 4096;
 
                 int index = getNextImageIndex();
-                display.update(index, clientAddress + "", false);
+                display.update(index, clientSocket.getInetAddress() + "", false);
                 outputLine = "server_asks_for " + index;
                 // ---------------- send MESSAGE 1
                 out.println(outputLine);
@@ -238,10 +244,10 @@ public class BlenderParallelRendering {
 
                 if (fromClient.startsWith("server")) {
                     // The server already wrote the image, nothing more to do.
-
+//                    System.out.println("Server rendered image. Nothing todo.");
                 } else {
                     // We must receive the image from the client.
-
+//                    System.out.println("Client did work.");
                     System.out.println("" + fromClient);
                     // fromClient has the format "client 0x123456789, 127.0.0.42 rendered 1234 size 40000"
                     imageSize = Integer.parseInt(fromClient.split(" ")[7]);
@@ -259,15 +265,11 @@ public class BlenderParallelRendering {
                     // ----------------- send MESSAGE 3
                     out.println("Server is ready for image");
 
-                    int offset = 0;
-                    int step = 0;
                     try {
                         int count = 0;
                         // -------------- receive DATA
                         while ((count = dataStream.read(bytes)) != -1) {
                             fileStream.write(bytes, 0, count);
-                            offset += count;
-                            step++;
                         }
                     } catch (java.net.SocketException e) {
                         // TODO: what do we do in case of a socket exception ?
@@ -280,7 +282,7 @@ public class BlenderParallelRendering {
                     fileStream.close();
                     dataStream.close();
                 }
-                display.update(index, clientAddress, true);
+                display.update(index, clientSocket.getInetAddress() + "", true);
 
                 avgCalc.add((int) System.currentTimeMillis());
 
