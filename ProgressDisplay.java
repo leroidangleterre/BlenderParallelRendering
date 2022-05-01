@@ -5,19 +5,28 @@
  */
 package blenderparallelrendering;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Graphics;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 
 /**
  *
  * @author arthurmanoha
  */
-public class ProgressDisplay extends JPanel implements MouseWheelListener {
+public class ProgressDisplay extends JFrame implements MouseWheelListener, Subscriber {
 
     // This tab represents the distribution of the clients that rendered the images.
     // It contains the id of the client, or -1 if the image was not rendered yet.
@@ -36,8 +45,30 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
 
     private int displayOffset = 0;
 
-    // A ProgressDisplay is always created with a complete list of indices.
-    public ProgressDisplay(int[] array) {
+    int textfieldWidth = 5;
+
+    private ArrayList<Subscriber> subList;
+
+    public ProgressDisplay() {
+
+        subList = new ArrayList<>();
+
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        setLayout(new BorderLayout());
+        JPanel topButtonsPanel = new JPanel();
+        topButtonsPanel.setLayout(new BorderLayout());
+        JPanel allTasksPanel = new JPanel();
+        allTasksPanel.setLayout(new BoxLayout(allTasksPanel, BoxLayout.PAGE_AXIS));
+        JPanel bottomButtonsPanel = new JPanel();
+        bottomButtonsPanel.setBackground(Color.gray);
+        setButtons(topButtonsPanel, allTasksPanel, bottomButtonsPanel);
+
+        add(topButtonsPanel, BorderLayout.NORTH);
+        add(allTasksPanel, BorderLayout.CENTER);
+        add(bottomButtonsPanel, BorderLayout.SOUTH);
+        setVisible(true);
+
         // Hashmap key: string value of client; value: allocated color.
         colors = new HashMap<>();
         availableColors = new ArrayList<>();
@@ -46,25 +77,6 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
         availableColors.add(Color.yellow);
         availableColors.add(Color.green);
         availableColors.add(Color.cyan);
-
-        clientPortTab = new String[array.length];
-        imageIndexTab = new int[array.length];
-
-        for (int i = 0; i < array.length; i++) {
-            clientPortTab[i] = NOT_STARTED;
-            imageIndexTab[i] = array[i];
-        }
-
-        nbColumns = 20;
-        nbLines = clientPortTab.length / nbColumns;
-        if (nbColumns * nbLines != clientPortTab.length) {
-            // Not a perfect square, need to add a line.
-            nbLines++;
-        }
-
-        computeHeight();
-
-        this.addMouseWheelListener(this);
 
         repaint();
     }
@@ -80,7 +92,7 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
      * @param finished true when the image is confirmed done, false when it is
      * still being computed.
      */
-    public void update(int renderedImageIndex, String clientAddress, boolean finished) {
+    public void update(String renderedImageInfo, String clientAddress, boolean finished) {
 
         String clientPort;
 
@@ -92,191 +104,129 @@ public class ProgressDisplay extends JPanel implements MouseWheelListener {
             // This is probably the client who rendered the latest image before this one.
             clientPort = latestClient + PROBABLY;
         }
-        int rank = findRankOfImage(renderedImageIndex);
+        int rank = findRankOfImage(renderedImageInfo);
         clientPortTab[rank] = clientPort;
         repaint();
     }
 
-    protected int findRankOfImage(int imageNumber) {
+    protected int findRankOfImage(String imageInfo) {
         int rank = 0;
-        while (rank < imageIndexTab.length && imageIndexTab[rank] != imageNumber) {
-            rank++;
-        }
-        if (rank == imageIndexTab.length) {
-            return 0;
-        } else {
-            return rank;
-        }
+        // TODO
+        return rank;
     }
 
-    private void paintOneSquare(int squareIndex, int imageIndex, int squareWidth, int remainingPixels, Graphics g) {
-//        System.out.println("paintOneSquare; squareIndex: " + squareIndex + ", image index: " + imageIndex);
-        int line = squareIndex / nbColumns;
-        int col = squareIndex - line * nbColumns;
-        int x = col * squareWidth + (remainingPixels * col) / nbColumns;
-        int y = (line + displayOffset) * squareWidth;
-        String client;
+    private void setButtons(JPanel topPanel, JPanel allTasksPanel, JPanel bottomPanel) {
 
-        if (imageIndex == -1) {
-            client = "no_client_yet";
-        } else {
-            client = clientPortTab[squareIndex];
-        }
-
-//        Color color = chooseColor(NOT_STARTED);
-        Color color = chooseColor(client);
-        g.setColor(color);
-
-        if (client.contains(PROBABLY)) {
-            // paint half square with the client's color
-            int xTab[] = {x, x + squareWidth, x};
-            int yTab[] = {y, y, y + squareWidth};
-            g.fillPolygon(xTab, yTab, 3);
-            // Paint the rest black
-            xTab[0] = x + squareWidth;
-            yTab[0] = y + squareWidth;
-            g.setColor(Color.black);
-            g.fillPolygon(xTab, yTab, 3);
-        } else {
-            // paint full square
-            g.fillRect(x, y, squareWidth, squareWidth);
-        }
-
-        // Paint image index
-        g.setColor(Color.gray);
-        g.drawString(imageIndex + "", x + 2, y - 1 + squareWidth);
-        // Paint the client id if the image is done
-        if (!client.equals(NOT_STARTED) && !client.equals(NOT_FINISHED)) {
-            if (client.contains(PROBABLY)) {
-                client = client.substring(0, client.length() - PROBABLY.length());
+        JButton addTaskButton = new JButton("Add task");
+        addTaskButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JPanel singleTaskPanel = new JPanel();
+                createNewTask(singleTaskPanel);
+                System.out.println("Task created.");
+                singleTaskPanel.setBackground(getRandomColor());
+                allTasksPanel.add(singleTaskPanel);
+                revalidate();
             }
-            g.drawString(client + "", x + 2, y - 1 + squareWidth / 2);
-        }
 
-        // Paint the border of the square
-        g.setColor(Color.gray);
-        g.drawRect(x, y, squareWidth, squareWidth);
-    }
-
-    @Override
-    public void paintComponent(Graphics g) {
-
-        // Erase everything
-        g.setColor(Color.white);
-        g.fillRect(0, 0, this.getWidth(), this.getHeight());
-
-        int squareWidth = this.getWidth() / nbColumns;
-
-        // The additional pixels will be spread among the columns.
-        int remainingPixels = this.getWidth() - squareWidth * nbColumns;
-
-        // Paint the squares.
-        for (int squareIndex = 0; squareIndex < clientPortTab.length; squareIndex++) {
-            // The squares are numbered from zero, but the images may have different indices.
-            int imageIndex = imageIndexTab[squareIndex];
-            try {
-                paintOneSquare(squareIndex, imageIndex, squareWidth, remainingPixels, g);
-            } catch (ArrayIndexOutOfBoundsException e) {
-                System.out.println("Exception for square index " + squareIndex + ", image index: " + imageIndex);
+            private Color getRandomColor() {
+                int val = (int) (Math.random() * 256);
+                return new Color(val, val, val);
             }
-        }
-    }
 
-    private Color chooseColor(String client) {
+        });
 
-        // The color used for this client
-        Color color;
-
-        if (client.equals(NOT_STARTED)) {
-            // Image not allocated.
-            color = Color.black;
-        } else if (client.contains(PROBABLY)) {
-            // Not exactly sure about which client it is, but it's very likely.
-            String probableClient = client.substring(0, client.length() - PROBABLY.length());
-            color = colors.get(probableClient);
-        } else if (client.equals(NOT_FINISHED)) {
-            // Image being computed
-            color = Color.gray;
-        } else if (!colors.containsKey(client + "")) {
-            // A new client rendered its first image
-            color = availableColors.remove(0);
-            colors.put(client + "", color);
-        } else {
-            color = colors.get(client + "");
-        }
-
-        return color;
+        bottomPanel.add(addTaskButton);
     }
 
     /**
-     * Set the height to the appropriate value, given the current width of the
-     * panel.
+     * Add a task to the progress display, and set it up for the server.
      *
+     * @param p
      */
-    private void computeHeight() {
+    private void createNewTask(JPanel singleTaskPanel) {
 
-        if (nbLines == nbColumns) {
-            newHeight = this.getWidth();
-        } else {
-            int squareSize = this.getWidth() / nbColumns;
-            newHeight = this.getWidth() + squareSize;
-        }
+        JTextArea jobId = new JTextArea("id 0");
 
-    }
+        JTextField filenameField = new JTextField("", 20);
+        JButton chooseFileButton = new JButton("select file");
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setCurrentDirectory(new File("D:\\Blender"));
 
-    public void increaseNbCols(boolean mustIncrease) {
-        if (mustIncrease) {
-            nbColumns++;
-        } else {
-            if (nbColumns > 1) {
-                nbColumns--;
+        JTextField startIndex = new JTextField("", textfieldWidth);
+        startIndex.setToolTipText("start frame");
+
+        JTextField endIndex = new JTextField("", textfieldWidth);
+        endIndex.setToolTipText("end frame");
+
+        JButton goOrStopButton = new JButton("Go");
+        goOrStopButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                String infoText;
+                if (fileChooser.getSelectedFile() != null && !startIndex.getText().equals("") && !endIndex.getText().equals("")) {
+                    infoText = fileChooser.getSelectedFile().getName() + " " + startIndex.getText() + " " + endIndex.getText();
+                    if (goOrStopButton.getText().equals("Go")) {
+                        // Need to start the task
+                        infoText = "Go " + infoText;
+                    } else {
+                        // Need to stop it.
+                        infoText = "Stop " + infoText;
+                    }
+                    notifyListeners(infoText);
+                } else {
+                    System.out.println("Cannot tell server: missing info in task description.");
+                }
             }
         }
-        nbLines = clientPortTab.length / nbColumns;
-        repaint();
+        );
+        JTextField progressIndicator = new JTextField("0/n");
+        JButton removeButton = new JButton("Remove task");
+
+        chooseFileButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int result = fileChooser.showOpenDialog(singleTaskPanel);
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    filenameField.setText(fileChooser.getSelectedFile().getName());
+                }
+                revalidate();
+            }
+        });
+
+        singleTaskPanel.add(jobId);
+        singleTaskPanel.add(filenameField);
+        singleTaskPanel.add(chooseFileButton);
+        singleTaskPanel.add(startIndex);
+        singleTaskPanel.add(endIndex);
+        singleTaskPanel.add(goOrStopButton);
+        singleTaskPanel.add(progressIndicator);
+        singleTaskPanel.add(removeButton);
     }
 
-    /**
-     * When doing a sequence, set all the indices with a step of 1.
-     *
-     * @param firstImageIndex
-     */
-    public void setFirstImageIndex(int firstImageIndex) {
-        for (int i = 0; i < imageIndexTab.length; i++) {
-            imageIndexTab[i] = firstImageIndex + i;
-        }
-    }
-
-    /**
-     * When doing a list of images (non-sequential), set the indices.
-     *
-     * @param array the indices of the images we need to render
-     */
-    public void setAllIndices(int[] array) {
-        imageIndexTab = array;
+    protected void invalidateImage(int imageToReset) {
+        System.out.println("invalidateImage TODO");
+        // TODO
     }
 
     @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
-        if (e.isControlDown()) {
-            nbColumns += e.getWheelRotation();
-        } else {
-            displayOffset -= e.getWheelRotation();
-        }
-        repaint();
     }
 
-    protected void invalidateImage(int imageToReset) {
-
-        int rank = findRankOfImage(imageToReset);
-        // Shift one step to the left all the images that were after the reset image.
-        for (int index = rank; index < imageIndexTab.length - 1; index++) {
-            imageIndexTab[index] = imageIndexTab[index + 1];
-            clientPortTab[index] = clientPortTab[index + 1];
+    // Add a new listener that will be informed about the tasks.
+    public void addListener(Subscriber s) {
+        if (!subList.contains(s)) {
+            subList.add(s);
         }
-        // Place the chosen image at the end.
-        imageIndexTab[imageIndexTab.length - 1] = imageToReset;
-        clientPortTab[clientPortTab.length - 1] = NOT_STARTED;
-        repaint();
+    }
+
+    public void update(String message) {
+        System.out.println("Progress display reseives message: " + message);
+    }
+
+    private void notifyListeners(String string) {
+        for (Subscriber s : subList) {
+            s.update(string);
+        }
     }
 }

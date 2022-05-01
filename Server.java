@@ -1,16 +1,5 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package blenderparallelrendering;
 
-//import static blenderparallelrendering.BlenderParallelRendering.NODE_NUMBER;
-//import static blenderparallelrendering.BlenderParallelRendering.TARGET_DIRECTORY;
-//import static blenderparallelrendering.BlenderParallelRendering.array;
-//import static blenderparallelrendering.BlenderParallelRendering.nbClientsConnected;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
@@ -23,28 +12,18 @@ import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
+import java.util.ArrayList;
 
 /**
  *
  * @author arthu
  */
-public class Server {
+public class Server implements Subscriber {
 
     private long startDate;
-    private int nbImagesNeeded;
-    private int nbImagesDone;
-    private boolean usingArray;
-    private int imgIndexArray[];
+    private ArrayList<Job> jobList;
     private int IMAGE_INDEX;
 
-    private JFrame window;
-    private int width = 1000, height = 800;
     private ProgressDisplay display;
     private AverageCalculator avgCalc;
     private ConnectionHandler cnxHandler;
@@ -52,21 +31,11 @@ public class Server {
     public int NODE_NUMBER = 0;
     private String targetDirectory;
 
-    public Server() {
-    }
+    private ArrayList<Subscriber> subList;
 
-    public void setImgArray(boolean USING_ARRAY, int[] array, int START_IMAGE_INDEX, int MAX_IMAGE_INDEX) {
-        if (USING_ARRAY) {
-            imgIndexArray = array;
-            nbImagesNeeded = imgIndexArray.length;
-        } else {
-            imgIndexArray = new int[MAX_IMAGE_INDEX - START_IMAGE_INDEX + 1];
-            for (int indexInArray = 0; indexInArray < imgIndexArray.length; indexInArray++) {
-                imgIndexArray[indexInArray] = START_IMAGE_INDEX + indexInArray;
-//                System.out.println("Setting " + indexInArray + "-th element of array to " + imgIndexArray[indexInArray]);
-            }
-            nbImagesNeeded = MAX_IMAGE_INDEX - START_IMAGE_INDEX + 1;
-        }
+    public Server() {
+        jobList = new ArrayList<>();
+        subList = new ArrayList<>();
     }
 
     public void run() {
@@ -80,29 +49,8 @@ public class Server {
             startDate = System.currentTimeMillis();
 
             IMAGE_INDEX = 0;
-            System.out.println("Rendering " + nbImagesNeeded + " images.");
-
-            nbImagesDone = 0;
-
-            window = new JFrame();
-
-            window.setPreferredSize(new Dimension(width, height));
-            window.setSize(new Dimension(width, height));
-            window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-            display = new ProgressDisplay(imgIndexArray);
-
-            display.setPreferredSize(new Dimension(width, height));
-            display.setSize(new Dimension(width, height));
 
             avgCalc = new AverageCalculator();
-
-            window.setLayout(new BorderLayout());
-            JPanel buttonsPanel = new JPanel();
-            setButtons(buttonsPanel);
-            window.add(buttonsPanel, BorderLayout.NORTH);
-            window.add(display);
-            window.setVisible(true);
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
@@ -112,53 +60,8 @@ public class Server {
 
         } catch (IOException e) {
             System.out.println("Server: IOException");
+            System.out.println(e);
         }
-    }
-
-    private void setButtons(JPanel p) {
-        JButton moreColsButton = new JButton("more cols");
-
-        moreColsButton.addActionListener((e) -> {
-            display.increaseNbCols(true);
-        });
-
-        JButton fewerColsButton = new JButton("fewer cols");
-        fewerColsButton.addActionListener((e) -> {
-            display.increaseNbCols(false);
-        });
-
-        p.add(moreColsButton);
-        p.add(fewerColsButton);
-
-        JButton moreEventsForAvg = new JButton("more images for average");
-        moreEventsForAvg.addActionListener((e) -> {
-            avgCalc.increaseSetSize();
-            System.out.println(cnxHandler.getETA());
-        });
-        p.add(moreEventsForAvg);
-        JButton fewerEventsForAvg = new JButton("fewer images for average");
-        fewerEventsForAvg.addActionListener((e) -> {
-            avgCalc.decreaseSetSize();
-            System.out.println(cnxHandler.getETA());
-        });
-        p.add(fewerEventsForAvg);
-
-        JTextField resetImageTextField = new JTextField();
-        int textFieldWidth = 8;
-        resetImageTextField.setColumns(textFieldWidth);
-        JButton resetImageButton = new JButton("Invalidate image");
-        resetImageButton.addActionListener((e) -> {
-            try {
-                int imageToReset = Integer.valueOf(resetImageTextField.getText());
-                System.out.println("Invalidate image " + imageToReset);
-                invalidateImage(imageToReset);
-            } catch (NumberFormatException ex) {
-                System.out.println("Cannot convert " + resetImageTextField.getText() + " to an integer.");
-            }
-        });
-
-        p.add(resetImageTextField);
-        p.add(resetImageButton);
     }
 
     /**
@@ -167,17 +70,14 @@ public class Server {
      *
      * @return the image index that the thread must render.
      */
-    public synchronized int getNextImageIndex() {
+    public synchronized String getNextImageInfo() {
 
-        // One more image is being processed.
-        nbImagesDone++; // TODO: this should be done when an image is confirmed.
-
-        int result;
-
-        result = imgIndexArray[IMAGE_INDEX];
-        System.out.println("getNextImageIndex: IMAGE_INDEX is " + IMAGE_INDEX + ", returning " + result);
-        IMAGE_INDEX++;
-        return result;
+        for (Job job : jobList) {
+            if (!job.isDone()) {
+                return job.getNextImageInfo();
+            }
+        }
+        return "none";
     }
 
     /**
@@ -187,18 +87,7 @@ public class Server {
      * @param imageToReset the index of the image that is being reset
      */
     private void invalidateImage(int imageToReset) {
-
-        int rank = display.findRankOfImage(imageToReset);
-        // Shift one step to the left all the images that were after the reset image.
-        for (int index = rank; index < imgIndexArray.length - 1; index++) {
-            imgIndexArray[index] = imgIndexArray[index + 1];
-        }
-        // Place the chosen image at the end.
-        imgIndexArray[imgIndexArray.length - 1] = imageToReset;
-        display.invalidateImage(imageToReset);
-
-        IMAGE_INDEX--;
-        nbImagesDone--;
+        // TODO
     }
 
     void setTargetDirectory(String targetDir) {
@@ -235,9 +124,9 @@ public class Server {
 
                 int bufferSize = 4096;
 
-                int index = getNextImageIndex();
-                display.update(index, clientAddress + "", false);
-                outputLine = "server_asks_for " + index;
+                String imageInfo = getNextImageInfo();
+                display.update(imageInfo, clientAddress + "", false);
+                outputLine = "server_asks_for " + imageInfo;
                 // ---------------- send MESSAGE 1
                 System.out.println("Server sends img index to client");
                 out.println(outputLine);
@@ -260,7 +149,7 @@ public class Server {
                     imageSize = Integer.parseInt(fromClient.split(" ")[6]);
 
                     // Actually receive the image and create the file
-                    File targetFile = new File(targetDirectory + "final_render" + index + ".png");
+                    File targetFile = new File(targetDirectory + "final_render" + imageInfo + ".png");
 
                     DataInputStream dataStream = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
                     FileOutputStream fileStream = new FileOutputStream(targetFile);
@@ -269,15 +158,11 @@ public class Server {
                     // ----------------- send MESSAGE 3
                     out.println("Server is ready for image");
 
-                    int offset = 0;
-                    int step = 0;
                     try {
                         int count = 0;
                         // -------------- receive DATA
                         while ((count = dataStream.read(bytes)) != -1) {
                             fileStream.write(bytes, 0, count);
-                            offset += count;
-                            step++;
                         }
                     } catch (java.net.SocketException e) {
                         // TODO: what do we do in case of a socket exception ?
@@ -290,18 +175,14 @@ public class Server {
                     fileStream.close();
                     dataStream.close();
                 }
-                display.update(index, clientAddress, true);
+                display.update(imageInfo, clientAddress, true);
 
                 avgCalc.add((int) System.currentTimeMillis());
 
                 String eta = getETA();
-                System.out.println("Node " + clientAddress + " f<" + index + "> " + eta);
-                window.setTitle(eta);
+                System.out.println("Node " + clientAddress + " f<" + imageInfo + "> " + eta);
+                notifyListeners("eta " + eta);
 
-                if (nbImagesDone >= nbImagesNeeded) {
-                    loop = false;
-                    System.out.println("Render finished.");
-                }
             } catch (IOException e) {
                 System.out.println("Error in handling connection");
                 nbClientsConnected--;
@@ -316,36 +197,7 @@ public class Server {
          */
         private String getETA() {
 
-            long elapsedMillisec = System.currentTimeMillis() - startDate;
-
-            int nbRemainingImages = nbImagesNeeded - nbImagesDone;
-
-            int averageMillisec = avgCalc.getAverage();
-
-            int estimatedRemainingMillisec = averageMillisec * nbRemainingImages;
-
-            String elapsed = convertSecToHMS((int) (elapsedMillisec / 1000));
-            String estimatedRemaining = convertSecToHMS(estimatedRemainingMillisec / 1000);
-            String estimatedTotal = convertSecToHMS((int) ((elapsedMillisec + estimatedRemainingMillisec) / 1000));
-
             String result = "";
-
-            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm:ss z");
-            Date completionDate = new Date(System.currentTimeMillis() + estimatedRemainingMillisec);
-
-            result += "Elapsed: " + elapsed
-                    + " remaining: " + estimatedRemaining
-                    + "est. total: " + estimatedTotal + " s "
-                    + " ETC: " + completionDate.toString().substring(4, 19)
-                    + "; Avg: ";
-            if (averageMillisec > 10000) {
-                result += averageMillisec / 1000 + " s/i; ";
-            } else {
-                result += averageMillisec + " ms/i; ";
-            }
-
-            result += nbRemainingImages + " remaining images";
-
             return result;
         }
     }
@@ -379,4 +231,28 @@ public class Server {
         return result;
     }
 
+    // Add a new listener that will be informed about the tasks.
+    public void addListener(Subscriber s) {
+        if (!subList.contains(s)) {
+            subList.add(s);
+        }
+    }
+
+    public void update(String message) {
+        String[] words = message.split(" ");
+        String command = words[0];
+        int startImage = Integer.valueOf(words[words.length - 2]);
+        int endImage = Integer.valueOf(words[words.length - 1]);
+        String file = "";
+        for (int i = 1; i <= words.length - 3; i++) {
+            file += words[i];
+        }
+        System.out.println("Server receives command: " + command + ", file: " + file + ", start:" + startImage + ", end: " + endImage);
+    }
+
+    private void notifyListeners(String string) {
+        for (Subscriber s : subList) {
+            s.update(string);
+        }
+    }
 }
