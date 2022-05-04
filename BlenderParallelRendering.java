@@ -14,7 +14,7 @@ public class BlenderParallelRendering {
 
     public static final int START_IMAGE_INDEX = 296;
     public static final int MAX_IMAGE_INDEX = 437;
-    public static final String TARGET_DIRECTORY = "D:\\Blender\\Dune\\png_rendered";
+    public static final String TARGET_DIRECTORY = "";
 
     public static boolean USING_ARRAY = false;
     public static int IMAGE_INDEX_IN_ARRAY;
@@ -26,10 +26,9 @@ public class BlenderParallelRendering {
      */
     public static void main(String[] args) throws IOException {
 
-        Server s = new Server();
+        Server server = new Server();
 
         ProgressDisplay progressDisplay;
-
         progressDisplay = new ProgressDisplay();
 
         int width = 1000, height = 800;
@@ -37,11 +36,13 @@ public class BlenderParallelRendering {
         progressDisplay.setPreferredSize(new Dimension(width, height));
         progressDisplay.setSize(new Dimension(width, height));
 
-        progressDisplay.addListener(s);
-        s.addListener(progressDisplay);
+        progressDisplay.addListener(server);
+        server.addListener(progressDisplay);
 
-        s.setTargetDirectory(TARGET_DIRECTORY);
+        server.setTargetDirectory(TARGET_DIRECTORY);
 
-        s.run();
+        server.createTestJob();
+
+        server.run();
     }
 }

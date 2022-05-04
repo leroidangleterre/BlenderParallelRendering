@@ -19,7 +19,6 @@ public class AverageCalculator {
     public AverageCalculator() {
         dateList = new ArrayList<>();
         dateList.add((int) (System.currentTimeMillis()));
-        System.out.println("AverageCalculator init at date " + dateList.get(0));
     }
 
     /**

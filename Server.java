@@ -31,16 +31,15 @@ public class Server implements Subscriber {
     public int NODE_NUMBER = 0;
     private String targetDirectory;
 
-    private ArrayList<Subscriber> subList;
+    private ArrayList<Subscriber> listeners;
 
     public Server() {
         jobList = new ArrayList<>();
-        subList = new ArrayList<>();
+        listeners = new ArrayList<>();
     }
 
     public void run() {
         int port = 65432;
-
         try {
             ServerSocket serverSocket = new ServerSocket(port);
             InetAddress localhost = InetAddress.getLocalHost();
@@ -51,7 +50,6 @@ public class Server implements Subscriber {
             IMAGE_INDEX = 0;
 
             avgCalc = new AverageCalculator();
-
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 cnxHandler = new ConnectionHandler(clientSocket, display);
@@ -92,6 +90,16 @@ public class Server implements Subscriber {
 
     void setTargetDirectory(String targetDir) {
         targetDirectory = targetDir;
+    }
+
+    /**
+     * Create a single job, as a user would do, for testing purposes.
+     */
+    public void createTestJob() {
+        Job j = new Job("test_render.blend", 1, 100);
+        jobList.add(j);
+        String notification = "NEW_JOB " + j.toString();
+        notifyListeners(notification);
     }
 
     private class ConnectionHandler implements Runnable {
@@ -233,25 +241,53 @@ public class Server implements Subscriber {
 
     // Add a new listener that will be informed about the tasks.
     public void addListener(Subscriber s) {
-        if (!subList.contains(s)) {
-            subList.add(s);
+        if (!listeners.contains(s)) {
+            listeners.add(s);
         }
     }
 
+    @Override
     public void update(String message) {
         String[] words = message.split(" ");
         String command = words[0];
-        int startImage = Integer.valueOf(words[words.length - 2]);
-        int endImage = Integer.valueOf(words[words.length - 1]);
-        String file = "";
-        for (int i = 1; i <= words.length - 3; i++) {
-            file += words[i];
+
+        if (command.equals("DETAILS")) {
+            String jobID = words[1];
+        } else if (command.equals("Start")) {
+            String jobName = words[1];
+            startJob(jobName, true);
+        } else if (command.equals("Stop")) {
+            String jobName = words[1];
+            startJob(jobName, false);
         }
-        System.out.println("Server receives command: " + command + ", file: " + file + ", start:" + startImage + ", end: " + endImage);
+    }
+
+    /**
+     * Flag a job as started so that clients can take tasks.
+     *
+     * @param jobID the rank of the job we are starting.
+     * @param mustStart true when the job must start, false when the job must
+     * stop.
+     */
+    private void startJob(String jobName, boolean mustStart) {
+        int jobRank = 0;
+        for (Job j : jobList) {
+            if (j.getName().equals(jobName)) {
+                j.start();
+                String notif;
+                if (mustStart) {
+                    notif = "JOB_STARTED " + jobRank;
+                } else {
+                    notif = "JOB_STOPPED " + jobRank;
+                }
+                notifyListeners(notif);
+            }
+            jobRank++;
+        }
     }
 
     private void notifyListeners(String string) {
-        for (Subscriber s : subList) {
+        for (Subscriber s : listeners) {
             s.update(string);
         }
     }
