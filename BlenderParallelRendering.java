@@ -37,7 +37,6 @@ public class BlenderParallelRendering {
 
         Server server = new Server();
 
-
         ProgressDisplay progressDisplay;
         progressDisplay = new ProgressDisplay();
 
@@ -49,10 +48,10 @@ public class BlenderParallelRendering {
         progressDisplay.addListener(server);
         server.addListener(progressDisplay);
 
-
         server.setTargetDirectory(TARGET_DIRECTORY);
 
         server.createTestJob();
 
         server.run();
     }
+}
