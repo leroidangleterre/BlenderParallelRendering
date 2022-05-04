@@ -11,7 +11,7 @@ import java.util.ArrayList;
 public class AverageCalculator {
 
     // The events more recent than that duration are taken into account.
-    private int nbEventsMax = 20;
+    private int nbEventsMax = 10;
 
     // Dates of completion of the most recent images.
     private ArrayList<Integer> dateList;

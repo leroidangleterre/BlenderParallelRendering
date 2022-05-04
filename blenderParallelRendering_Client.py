@@ -12,7 +12,7 @@ scene = bpy.context.scene
 
 
 port = 65432
-address = '192.168.1.39'
+address = '192.168.56.1'
 
 print("START ----------------------------------------------")
 
@@ -70,7 +70,7 @@ try:
         # Read from the server        
         data = s.recv(1000).decode()
                 
-        if (data.find("END") >= 0):
+        if (data.find("END") >= 0 or data.find("-1") >= 0):
             # end detected.
             loop = False
             print("Detecting end")
