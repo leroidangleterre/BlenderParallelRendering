@@ -2,6 +2,7 @@ package blenderparallelrendering;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
@@ -84,12 +85,12 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
         jobsPanel.setBackground(Color.gray);
 
         requestDetails(-1);
+        jobDetailsPanel = new JPanel();
+        jobDetailsPanel.setLayout(new BorderLayout());
 
         jobDetailsTitle = new JLabel("Selected Job");
-        jobDetailsPanel = new JPanel();
-
-        jobDetailsPanel.setLayout(new BorderLayout());
         jobDetailsPanel.add(jobDetailsTitle, BorderLayout.NORTH);
+        jobDetailsPanel.add(jobDetailsTable.getTableHeader(), BorderLayout.NORTH);
         jobDetailsPanel.add(jobDetailsTable, BorderLayout.CENTER);
         jobDetailsPanel.setBackground(Color.gray.brighter());
 
@@ -132,7 +133,7 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
     private void requestDetails(int row) {
         String jobID;
         if (row == -1) {
-            jobID = "0";
+            jobID = "-1";
         } else {
             jobID = jobsTable.getValueAt(row, 0) + "";
         }
@@ -152,10 +153,12 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
      *
      */
     private void actionChangeRequest(int taskNumber) {
-        String command = (String) jobsTable.getModel().getValueAt(taskNumber, jobsTable.getColumnCount() - 2);
-        String jobName = (String) jobsTable.getModel().getValueAt(taskNumber, 0);
-        String notification = command + " " + jobName;
-        notifyListeners(notification);
+        if (taskNumber != -1) {
+            String command = (String) jobsTable.getModel().getValueAt(taskNumber, jobsTable.getColumnCount() - 2);
+            String jobName = (String) jobsTable.getModel().getValueAt(taskNumber, 0);
+            String notification = command + " " + jobName;
+            notifyListeners(notification);
+        }
     }
 
     /**
@@ -309,6 +312,10 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
         } else if (words[0].equals("JOB_STOPPED")) {
             int jobID = Integer.valueOf(words[1]);
             flagJobAsStarted(jobID, false);
+        } else if (words[0].equals("JOB_DETAILS")) {
+            System.out.println("Display receives job details: ");
+            // Rebuild jobDetailsTable with the new info
+            buildDetailsTable(words);
         }
     }
 
@@ -358,6 +365,8 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
             jobsPanel.add(jobsTable.getTableHeader(), BorderLayout.NORTH);
             jobsPanel.add(jobsTable, BorderLayout.CENTER);
 
+            jobsTable.setColumnWidth();
+
             jobsTable.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
@@ -386,5 +395,29 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
         DefaultTableModel model = (DefaultTableModel) jobsTable.getModel();
         String[] newRow = {jobName, status, firstImage, lastImage, "15/100", "Start", "Details"};
         model.addRow(newRow);
+    }
+
+    // Add all the information about frames to the GUI table.
+    private void buildDetailsTable(String[] allFramesInfo) {
+
+        DefaultTableModel model = (DefaultTableModel) jobDetailsTable.getModel();
+        for (String singleFrameInfo : allFramesInfo) {
+            String info[] = singleFrameInfo.split(":");
+            if (info.length == 1) {
+                // This line can be "JOB_DETAILS" or the name of the job.
+                if (!info[0].equals("JOB_DETAILS")) {
+                    // Job name
+                    jobDetailsTitle.setText(info[0]);
+                }
+            } else {
+                // This line is actual information about a frame.
+                String frameNumber = info[0];
+                String status = info[1];
+                String host = info[2];
+                String[] newRow = {frameNumber, status, host};
+                model.addRow(newRow);
+            }
+        }
+        jobDetailsPanel.setPreferredSize(new Dimension(500, 500));
     }
 }
