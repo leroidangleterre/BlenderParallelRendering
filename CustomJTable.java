@@ -47,4 +47,7 @@ public class CustomJTable extends JTable {
         return (String) this.columnModel.getColumn(col).getHeaderValue();
     }
 
+    public void setColumnWidth() {
+        columnModel.getColumn(0).setPreferredWidth(300);
+    }
 }

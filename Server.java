@@ -96,7 +96,7 @@ public class Server implements Subscriber {
      * Create a single job, as a user would do, for testing purposes.
      */
     public void createTestJob() {
-        Job j = new Job("test_render.blend", 1, 100);
+        Job j = new Job("test_render.blend", 300, 800);
         jobList.add(j);
         String notification = "NEW_JOB " + j.toString();
         notifyListeners(notification);
@@ -250,15 +250,24 @@ public class Server implements Subscriber {
     public void update(String message) {
         String[] words = message.split(" ");
         String command = words[0];
+        String jobName;
+        String jobID;
 
-        if (command.equals("DETAILS")) {
-            String jobID = words[1];
-        } else if (command.equals("Start")) {
-            String jobName = words[1];
+        switch (command) {
+        case "DETAILS":
+            jobID = words[1];
+            sendJobDetails(jobID);
+            break;
+        case "Start":
+            jobName = words[1];
             startJob(jobName, true);
-        } else if (command.equals("Stop")) {
-            String jobName = words[1];
+            break;
+        case "Stop":
+            jobName = words[1];
             startJob(jobName, false);
+            break;
+        default:
+            break;
         }
     }
 
@@ -289,6 +298,32 @@ public class Server implements Subscriber {
     private void notifyListeners(String string) {
         for (Subscriber s : listeners) {
             s.update(string);
+        }
+    }
+
+    /**
+     * Send detailed information about the job identified by its name.
+     *
+     * @param jobName the name of the job, or "-1" in case of an error from the
+     * GUI
+     */
+    private void sendJobDetails(String jobName) {
+        if (jobName.equals("-1")) {
+            return;
+        }
+        System.out.println("Server is sending details for job " + jobName);
+        Job selectedJob = null;
+        for (Job j : jobList) {
+            if (j.getName().equals(jobName)) {
+                selectedJob = j;
+            }
+        }
+        if (selectedJob != null) {
+            // Send info now
+            String message = "JOB_DETAILS";
+            message += " " + selectedJob.getName();
+            message += " " + selectedJob.getFramesDetail();
+            notifyListeners(message);
         }
     }
 }

@@ -12,8 +12,6 @@ import java.io.IOException;
  */
 public class BlenderParallelRendering {
 
-    public static final int START_IMAGE_INDEX = 296;
-    public static final int MAX_IMAGE_INDEX = 437;
     public static final String TARGET_DIRECTORY = "";
 
     public static boolean USING_ARRAY = false;
