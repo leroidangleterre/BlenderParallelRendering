@@ -49,7 +49,11 @@ public class BlenderParallelRendering {
         server.setTargetDirectory(TARGET_DIRECTORY);
 
         server.createTestJob();
+        server.createTestJob();
+        server.createTestJob();
+        server.createTestJob();
 
         server.run();
+        progressDisplay.revalidate();
     }
 }

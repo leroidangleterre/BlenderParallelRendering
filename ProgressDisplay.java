@@ -20,6 +20,7 @@ import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -55,6 +56,7 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
 
     private JPanel jobDetailsPanel;
     private JLabel jobDetailsTitle;
+    private JScrollPane jobDetailScrollPane;
     private CustomJTable jobDetailsTable;
 
     private JTable hostTable;
@@ -88,13 +90,8 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
         jobDetailsPanel = new JPanel();
         jobDetailsPanel.setLayout(new BorderLayout());
 
-        jobDetailsTitle = new JLabel("Selected Job");
-        jobDetailsPanel.add(jobDetailsTitle, BorderLayout.NORTH);
-        jobDetailsPanel.add(jobDetailsTable.getTableHeader(), BorderLayout.NORTH);
-        jobDetailsPanel.add(jobDetailsTable, BorderLayout.CENTER);
-        jobDetailsPanel.setBackground(Color.gray.brighter());
-
-        jobsPanelTitle = new JLabel("Jobs Panel Title");
+        jobDetailsTitle = new JLabel("Selected job");
+        jobsPanelTitle = new JLabel("All jobs");
 
         c = new GridBagConstraints();
         c.anchor = GridBagConstraints.CENTER;
@@ -105,8 +102,15 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
         mainPanel.add(jobsPanelTitle, c);
         c.gridy = 2;
         mainPanel.add(jobDetailsTitle, c);
+
+        // Scroll pane that contains jobDetailsPanel
+        jobDetailScrollPane = new JScrollPane(jobDetailsPanel);
+        jobDetailScrollPane.setPreferredSize(new Dimension(500, 500));
+        jobDetailScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        jobDetailScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+
         c.gridy = 3;
-        mainPanel.add(jobDetailsPanel, c);
+        mainPanel.add(jobDetailScrollPane, c);
 
         add(mainPanel);
 
@@ -120,7 +124,7 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
         availableColors.add(Color.yellow);
         availableColors.add(Color.green);
         availableColors.add(Color.cyan);
-
+        revalidate();
         repaint();
     }
 
@@ -139,13 +143,6 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
         }
         String notification = "DETAILS " + jobID;
         notifyListeners(notification);
-        Object dataDetails[][] = new Object[][]{
-            {"-", "-", "-"}
-        };
-
-        String[] detailsColumn = new String[]{"Frame", "Status", "Host"};
-
-        jobDetailsTable = new CustomJTable(dataDetails, detailsColumn);
     }
 
     /**
@@ -205,7 +202,6 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
                 createNewJob(singleTaskPanel);
                 singleTaskPanel.setBackground(getRandomColor());
                 allTasksPanel.add(singleTaskPanel);
-                revalidate();
             }
 
             private Color getRandomColor() {
@@ -269,7 +265,6 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
                 if (result == JFileChooser.APPROVE_OPTION) {
                     filenameField.setText(fileChooser.getSelectedFile().getName());
                 }
-                revalidate();
             }
         });
 
@@ -303,20 +298,42 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
     public void update(String message) {
 
         String[] words = message.split(" ");
-        if (words[0].equals("NEW_JOB")) {
+        int jobID;
+
+        switch (words[0]) {
+        case "NEW_JOB":
             // Add a new job to the list.
             addNewJob(words);
-        } else if (words[0].equals("JOB_STARTED")) {
-            int jobID = Integer.valueOf(words[1]);
+            break;
+        case "JOB_STARTED":
+            jobID = Integer.valueOf(words[1]);
             flagJobAsStarted(jobID, true);
-        } else if (words[0].equals("JOB_STOPPED")) {
-            int jobID = Integer.valueOf(words[1]);
+            break;
+        case "JOB_STOPPED":
+            jobID = Integer.valueOf(words[1]);
             flagJobAsStarted(jobID, false);
-        } else if (words[0].equals("JOB_DETAILS")) {
-            System.out.println("Display receives job details: ");
+            break;
+        case "JOB_DETAILS":
             // Rebuild jobDetailsTable with the new info
             buildDetailsTable(words);
+            break;
+        case "FILENAME_CHANGED":
+            // Transmit the info to the server
+            notifyListeners(message);
+            break;
+        case "SET_FIRST_FRAME":
+            notifyListeners(message);
+            break;
+        case "SET_LAST_FRAME":
+            notifyListeners(message);
+            break;
+        default:
+            break;
         }
+
+        jobDetailsPanel.revalidate();
+        revalidate();
+        repaint();
     }
 
     /**
@@ -382,8 +399,8 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
                         requestDetails(row);
                     }
                 }
-            }
-            );
+            });
+            jobsTable.addListener(this);
 
             c.gridy = 1;
             mainPanel.add(jobsPanel, c);
@@ -400,7 +417,23 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
     // Add all the information about frames to the GUI table.
     private void buildDetailsTable(String[] allFramesInfo) {
 
-        DefaultTableModel model = (DefaultTableModel) jobDetailsTable.getModel();
+        Object dataDetails[][] = new Object[][]{
+            {"-", "-", "-"}
+        };
+
+        String[] detailsColumn = new String[]{"Frame", "Status", "Host"};
+
+        // Create the table, or clear the previous values.
+        if (jobDetailsTable == null) {
+            jobDetailsTable = new CustomJTable(dataDetails, detailsColumn);
+            jobDetailsPanel.add(jobDetailsTable);
+        } else {
+            // Clear table
+            while (jobDetailsTable.getRowCount() > 0) {
+                ((DefaultTableModel) jobDetailsTable.getModel()).removeRow(0);
+            }
+        }
+
         for (String singleFrameInfo : allFramesInfo) {
             String info[] = singleFrameInfo.split(":");
             if (info.length == 1) {
@@ -414,10 +447,12 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
                 String frameNumber = info[0];
                 String status = info[1];
                 String host = info[2];
+
+                // Simply add the new data
+                DefaultTableModel model = (DefaultTableModel) jobDetailsTable.getModel();
                 String[] newRow = {frameNumber, status, host};
                 model.addRow(newRow);
             }
         }
-        jobDetailsPanel.setPreferredSize(new Dimension(500, 500));
     }
 }

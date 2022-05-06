@@ -62,6 +62,34 @@ public class Job {
     }
 
     /**
+     * Get the index of this job's first frame.
+     *
+     * @return the first frame of this job
+     */
+    public int getStartFrame() {
+        return this.startFrame;
+    }
+
+    /**
+     * Get the index of this job's last frame.
+     *
+     * @return the last frame of this job
+     */
+    public int getEndFrame() {
+        return this.endFrame;
+    }
+
+    public void setFirstFrame(int frame) {
+        this.startFrame = frame;
+        initImageList();
+    }
+
+    public void setLastFrame(int frame) {
+        this.endFrame = frame;
+        initImageList();
+    }
+
+    /**
      * Build the list of all images
      *
      */
