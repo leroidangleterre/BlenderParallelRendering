@@ -96,7 +96,21 @@ public class Server implements Subscriber {
      * Create a single job, as a user would do, for testing purposes.
      */
     public void createTestJob() {
-        Job j = new Job("test_render.blend", 300, 800);
+        Job j;
+        switch (jobList.size()) {
+        case 0:
+            j = new Job("test_job_0_10.blend", 0, 10);
+            break;
+        case 1:
+            j = new Job("test_job_10_21.blend", 10, 21);
+            break;
+        case 2:
+            j = new Job("test_job_20_32.blend", 20, 32);
+            break;
+        default:
+            j = new Job("test_job_30_43.blend", 30, 73);
+            break;
+        }
         jobList.add(j);
         String notification = "NEW_JOB " + j.toString();
         notifyListeners(notification);
@@ -252,6 +266,8 @@ public class Server implements Subscriber {
         String command = words[0];
         String jobName;
         String jobID;
+        int jobRank;
+        int frame;
 
         switch (command) {
         case "DETAILS":
@@ -265,6 +281,23 @@ public class Server implements Subscriber {
         case "Stop":
             jobName = words[1];
             startJob(jobName, false);
+            break;
+        case "FILENAME_CHANGED":
+            jobRank = Integer.valueOf(words[1]);
+            String newJobName = words[2];
+            Job oldJob = jobList.get(jobRank);
+            Job newJob = new Job(newJobName, oldJob.getStartFrame(), oldJob.getEndFrame());
+            jobList.set(jobRank, newJob);
+            break;
+        case "SET_FIRST_FRAME":
+            jobRank = Integer.valueOf(words[1]);
+            frame = Integer.valueOf(words[2]);
+            jobList.get(jobRank).setFirstFrame(frame);
+            break;
+        case "SET_LAST_FRAME":
+            jobRank = Integer.valueOf(words[1]);
+            frame = Integer.valueOf(words[2]);
+            jobList.get(jobRank).setLastFrame(frame);
             break;
         default:
             break;
@@ -311,7 +344,6 @@ public class Server implements Subscriber {
         if (jobName.equals("-1")) {
             return;
         }
-        System.out.println("Server is sending details for job " + jobName);
         Job selectedJob = null;
         for (Job j : jobList) {
             if (j.getName().equals(jobName)) {

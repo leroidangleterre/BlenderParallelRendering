@@ -1,5 +1,6 @@
 package blenderparallelrendering;
 
+import java.util.ArrayList;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableModel;
@@ -13,10 +14,13 @@ public class CustomJTable extends JTable {
 
     DefaultTableModel defModel;
 
+    private ArrayList<Subscriber> listeners;
+
     public CustomJTable(Object[][] data, String[] columns) {
         super(data, columns);
         defModel = new DefaultTableModel(columns, 0);
         super.dataModel = defModel;
+        listeners = new ArrayList<>();
     }
 
     @Override
@@ -50,4 +54,42 @@ public class CustomJTable extends JTable {
     public void setColumnWidth() {
         columnModel.getColumn(0).setPreferredWidth(300);
     }
+
+    @Override
+    public void setValueAt(Object newValue, int rowIndex, int colIndex) {
+        super.setValueAt(newValue, rowIndex, colIndex);
+
+        String notification = "";
+
+        switch (colIndex) {
+        case 0:
+            notification = "FILENAME_CHANGED " + rowIndex + " " + getValueAt(rowIndex, colIndex);
+            break;
+        case 2:
+            // Changed first frame
+            notification = "SET_FIRST_FRAME " + rowIndex + " " + getValueAt(rowIndex, colIndex);
+            break;
+        case 3:
+            // Changed last frame
+            notification = "SET_LAST_FRAME " + rowIndex + " " + getValueAt(rowIndex, colIndex);
+            break;
+        default:
+            break;
+        }
+        notifyListeners(notification);
+    }
+
+    // Add a new listener
+    public void addListener(Subscriber s) {
+        if (!listeners.contains(s)) {
+            listeners.add(s);
+        }
+    }
+
+    private void notifyListeners(String string) {
+        for (Subscriber s : listeners) {
+            s.update(string);
+        }
+    }
+
 }
