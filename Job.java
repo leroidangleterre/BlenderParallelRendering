@@ -14,7 +14,6 @@ public class Job {
     private Status status;
     private int startFrame;
     private int endFrame;
-    private boolean active;
 
     // These three lists must be changed in parallel
     private ArrayList<Integer> frameNumberList;
@@ -26,12 +25,26 @@ public class Job {
         status = Status.NOT_STARTED;
         startFrame = start;
         endFrame = end;
-        active = false;
         initImageList();
     }
 
     public String getNextImageInfo() {
-        return "lorem-ipsum 42";
+
+        if (this.isActive()) {
+
+            int rank = 0;
+            for (Status s : frameStatusList) {
+                if (s.equals(Status.NOT_STARTED)) {
+                    // We found an image that has yet to be assigned.
+                    String info = filename + " " + frameNumberList.get(rank);
+
+                    frameStatusList.set(rank, Status.IN_PROGRESS);
+                    return info;
+                }
+                rank++;
+            }
+        }
+        return "none";
     }
 
     public boolean isDone() {
@@ -39,7 +52,15 @@ public class Job {
     }
 
     public void start() {
-        active = true;
+        this.status = Status.IN_PROGRESS;
+    }
+
+    public void stop() {
+        this.status = Status.NOT_STARTED;
+    }
+
+    public boolean isActive() {
+        return this.status == Status.IN_PROGRESS;
     }
 
     /**
