@@ -30,7 +30,7 @@ import javax.swing.table.DefaultTableModel;
  *
  * @author arthurmanoha
  */
-public class ProgressDisplay extends JFrame implements MouseWheelListener, Subscriber {
+public class ServerDisplay extends JFrame implements MouseWheelListener, Subscriber {
 
     // This tab represents the distribution of the clients that rendered the images.
     // It contains the id of the client, or -1 if the image was not rendered yet.
@@ -71,7 +71,7 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
 
     private GridBagConstraints c;
 
-    public ProgressDisplay() {
+    public ServerDisplay() {
 
         listeners = new ArrayList<>();
 
@@ -114,6 +114,7 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
 
         add(mainPanel);
 
+        setTitle("Server window");
         setVisible(true);
 
         // Hashmap key: string value of client; value: allocated color.
@@ -313,6 +314,11 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
             jobID = Integer.valueOf(words[1]);
             flagJobAsStarted(jobID, false);
             break;
+        case "FRAME_ASSIGNED":
+            jobID = Integer.valueOf(words[3]);
+            int frame = Integer.valueOf(words[2]);
+            flagImageAsStarted(jobID, frame, true);
+            break;
         case "JOB_DETAILS":
             // Rebuild jobDetailsTable with the new info
             buildDetailsTable(words);
@@ -353,6 +359,22 @@ public class ProgressDisplay extends JFrame implements MouseWheelListener, Subsc
             model.setValueAt("Start", jobID, 5);
         }
         repaint();
+    }
+
+    /**
+     * Flag an image as started or stopped. Only useful when the job's details
+     * are being displayed.
+     *
+     * @param jobID
+     * @param frame
+     * @param b
+     */
+    private void flagImageAsStarted(int jobID, int frame, boolean started) {
+
+        DefaultTableModel model = (DefaultTableModel) jobDetailsTable.getModel();
+        if (started) {
+            model.setValueAt("In progress", frame, 0);
+        }
     }
 
     private void notifyListeners(String string) {

@@ -1,11 +1,6 @@
 package blenderparallelrendering;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -24,7 +19,7 @@ public class Server implements Subscriber {
     private ArrayList<Job> jobList;
     private int IMAGE_INDEX;
 
-    private ProgressDisplay display;
+    private ServerDisplay display;
     private AverageCalculator avgCalc;
     private ConnectionHandler cnxHandler;
     public int nbClientsConnected = 0;
@@ -70,10 +65,19 @@ public class Server implements Subscriber {
      */
     public synchronized String getNextImageInfo() {
 
+        String info;
+        int jobRank = 0;
+
         for (Job job : jobList) {
-            if (!job.isDone()) {
-                return job.getNextImageInfo();
+            info = job.getNextImageInfo();
+            if (!info.equals("none")) {
+                System.out.println("Server requested info " + info + " from Job ranked " + jobRank);
+                // Tell the display that an image is being assigned to a client.
+                String notif = "FRAME_ASSIGNED " + info + " " + jobRank;
+                notifyListeners(notif);
+                return info;
             }
+            jobRank++;
         }
         return "none";
     }
@@ -99,16 +103,16 @@ public class Server implements Subscriber {
         Job j;
         switch (jobList.size()) {
         case 0:
-            j = new Job("test_job_0_10.blend", 0, 10);
+            j = new Job("test_job_1", 0, 10);
             break;
         case 1:
-            j = new Job("test_job_10_21.blend", 10, 21);
+            j = new Job("test_job_2", 0, 10);
             break;
         case 2:
-            j = new Job("test_job_20_32.blend", 20, 32);
+            j = new Job("test_job_3", 0, 10);
             break;
         default:
-            j = new Job("test_job_30_43.blend", 30, 73);
+            j = new Job("test_job_4", 0, 10);
             break;
         }
         jobList.add(j);
@@ -120,13 +124,13 @@ public class Server implements Subscriber {
 
         String fromClient;
         Socket clientSocket;
-        ProgressDisplay display;
+        ServerDisplay display;
 
         public ConnectionHandler(Socket s) {
             this(s, null);
         }
 
-        private ConnectionHandler(Socket s, ProgressDisplay d) {
+        private ConnectionHandler(Socket s, ServerDisplay d) {
             clientSocket = s;
             nbClientsConnected++;
             display = d;
@@ -134,77 +138,79 @@ public class Server implements Subscriber {
 
         @Override
         public void run() {
+
+//            System.out.println("Server receives connection from client.");
             try {
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 String outputLine;
-
-                String clientAddress = NODE_NUMBER + "";
-                NODE_NUMBER++;
-                boolean loop = true;
-                int imageSize;
-
+//
+//                String clientAddress = NODE_NUMBER + "";
+//                NODE_NUMBER++;
+//                boolean loop = true;
+//                int imageSize;
+//
                 int bufferSize = 4096;
-
+//
                 String imageInfo = getNextImageInfo();
-                display.update(imageInfo, clientAddress + "", false);
+//                display.update(imageInfo, clientAddress + "", false);
                 outputLine = "server_asks_for " + imageInfo;
                 // ---------------- send MESSAGE 1
-                System.out.println("Server sends img index to client");
+//                System.out.println("Server sends img index to client");
                 out.println(outputLine);
-                System.out.println("Server done sending img index to client");
-
-                // Receive reply from client
-                // ---------------- receive MESSAGE 2
-                fromClient = in.readLine();
-                System.out.println("Server received from client: " + fromClient);
-                clientAddress = fromClient.split(" ")[1];
-
-                if (fromClient.startsWith("server")) {
-                    // The server already wrote the image, nothing more to do.
-
-                } else {
-                    // We must receive the image from the client.
-
-                    System.out.println("" + fromClient);
-                    // fromClient has the format "client 0x123456789, 127.0.0.42 rendered 1234 size 40000"
-                    imageSize = Integer.parseInt(fromClient.split(" ")[6]);
-
-                    // Actually receive the image and create the file
-                    File targetFile = new File(targetDirectory + "final_render" + imageInfo + ".png");
-
-                    DataInputStream dataStream = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
-                    FileOutputStream fileStream = new FileOutputStream(targetFile);
-                    byte[] bytes = new byte[bufferSize];
-
-                    // ----------------- send MESSAGE 3
-                    out.println("Server is ready for image");
-
-                    try {
-                        int count = 0;
-                        // -------------- receive DATA
-                        while ((count = dataStream.read(bytes)) != -1) {
-                            fileStream.write(bytes, 0, count);
-                        }
-                    } catch (java.net.SocketException e) {
-                        // TODO: what do we do in case of a socket exception ?
-                    } catch (EOFException e) {
-                        System.out.println("" + e);
-                    } catch (IOException e) {
-                        System.out.println("" + e);
-                    }
-
-                    fileStream.close();
-                    dataStream.close();
-                }
-                display.update(imageInfo, clientAddress, true);
-
-                avgCalc.add((int) System.currentTimeMillis());
-
-                String eta = getETA();
-                System.out.println("Node " + clientAddress + " f<" + imageInfo + "> " + eta);
-                notifyListeners("eta " + eta);
-
+//                System.out.println("Server done sending img index to client");
+//
+//                // Receive reply from client
+//                // ---------------- receive MESSAGE 2
+//                fromClient = in.readLine();
+//                System.out.println("Server received from client: " + fromClient);
+//                clientAddress = fromClient.split(" ")[1];
+//
+//                if (fromClient.startsWith("server")) {
+//                    // The server already wrote the image, nothing more to do.
+//
+//                } else {
+//                    // We must receive the image from the client.
+//
+//                    System.out.println("" + fromClient);
+//                    // fromClient has the format "client 0x123456789, 127.0.0.42 rendered 1234 size 40000"
+//                    imageSize = Integer.parseInt(fromClient.split(" ")[6]);
+//
+//                    // Actually receive the image and create the file
+//                    File targetFile = new File(targetDirectory + "final_render" + imageInfo + ".png");
+//
+//                    DataInputStream dataStream = new DataInputStream(new BufferedInputStream(clientSocket.getInputStream()));
+//                    FileOutputStream fileStream = new FileOutputStream(targetFile);
+//                    byte[] bytes = new byte[bufferSize];
+//
+//                    // ----------------- send MESSAGE 3
+//                    out.println("Server is ready for image");
+//
+//                    try {
+//                        int count = 0;
+//                        // -------------- receive DATA
+//                        while ((count = dataStream.read(bytes)) != -1) {
+//                            fileStream.write(bytes, 0, count);
+//                        }
+//                    } catch (java.net.SocketException e) {
+//                        // TODO: what do we do in case of a socket exception ?
+//                    } catch (EOFException e) {
+//                        System.out.println("" + e);
+//                    } catch (IOException e) {
+//                        System.out.println("" + e);
+//                    }
+//
+//                    fileStream.close();
+//                    dataStream.close();
+//                }
+//                display.update(imageInfo, clientAddress, true);
+//
+//                avgCalc.add((int) System.currentTimeMillis());
+//
+//                String eta = getETA();
+//                System.out.println("Node " + clientAddress + " f<" + imageInfo + "> " + eta);
+//                notifyListeners("eta " + eta);
+//
             } catch (IOException e) {
                 System.out.println("Error in handling connection");
                 nbClientsConnected--;
