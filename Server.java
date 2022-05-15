@@ -320,12 +320,13 @@ public class Server implements Subscriber {
         int jobRank = 0;
         for (Job j : jobList) {
             if (j.getName().equals(jobName)) {
-                j.start();
                 String notif;
                 if (mustStart) {
                     notif = "JOB_STARTED " + jobRank;
+                    j.start();
                 } else {
                     notif = "JOB_STOPPED " + jobRank;
+                    j.stop();
                 }
                 notifyListeners(notif);
             }
