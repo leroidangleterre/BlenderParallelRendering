@@ -6,24 +6,17 @@ import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
-import javax.swing.JButton;
-import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.table.DefaultTableModel;
 
 /**
@@ -58,6 +51,7 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
     private JLabel jobDetailsTitle;
     private JScrollPane jobDetailScrollPane;
     private CustomJTable jobDetailsTable;
+    private int currentlyDisplayedJobID;
 
     private JTable hostTable;
 
@@ -89,6 +83,7 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
         requestDetails(-1);
         jobDetailsPanel = new JPanel();
         jobDetailsPanel.setLayout(new BorderLayout());
+        currentlyDisplayedJobID = -1;
 
         jobDetailsTitle = new JLabel("Selected job");
         jobsPanelTitle = new JLabel("All jobs");
@@ -193,92 +188,6 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
         return rank;
     }
 
-    private void setButtons(JPanel topPanel, JPanel allTasksPanel, JPanel bottomPanel) {
-
-        JButton addTaskButton = new JButton("Add task");
-        addTaskButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JPanel singleTaskPanel = new JPanel();
-                createNewJob(singleTaskPanel);
-                singleTaskPanel.setBackground(getRandomColor());
-                allTasksPanel.add(singleTaskPanel);
-            }
-
-            private Color getRandomColor() {
-                int val = (int) (Math.random() * 256);
-                return new Color(val, val, val);
-            }
-
-        });
-
-        bottomPanel.add(addTaskButton);
-    }
-
-    /**
-     * Add a task to the progress display, and set it up for the server.
-     *
-     * @param p
-     */
-    private void createNewJob(JPanel singleTaskPanel) {
-
-        JTextArea jobId = new JTextArea("id 0");
-
-        JTextField filenameField = new JTextField("", 20);
-        JButton chooseFileButton = new JButton("select file");
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setCurrentDirectory(new File("D:\\Blender"));
-
-        JTextField startIndex = new JTextField("", textfieldWidth);
-        startIndex.setToolTipText("start frame");
-
-        JTextField endIndex = new JTextField("", textfieldWidth);
-        endIndex.setToolTipText("end frame");
-
-        JButton goOrStopButton = new JButton("Go");
-        goOrStopButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent event) {
-                String infoText;
-                if (fileChooser.getSelectedFile() != null && !startIndex.getText().equals("") && !endIndex.getText().equals("")) {
-                    infoText = fileChooser.getSelectedFile().getName() + " " + startIndex.getText() + " " + endIndex.getText();
-                    if (goOrStopButton.getText().equals("Go")) {
-                        // Need to start the task
-                        infoText = "Go " + infoText;
-                    } else {
-                        // Need to stop it.
-                        infoText = "Stop " + infoText;
-                    }
-                    notifyListeners(infoText);
-                } else {
-                    System.out.println("Cannot tell server: missing info in task description.");
-                }
-            }
-        }
-        );
-        JTextField progressIndicator = new JTextField("0/n");
-        JButton removeButton = new JButton("Remove task");
-
-        chooseFileButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int result = fileChooser.showOpenDialog(singleTaskPanel);
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    filenameField.setText(fileChooser.getSelectedFile().getName());
-                }
-            }
-        });
-
-        singleTaskPanel.add(jobId);
-        singleTaskPanel.add(filenameField);
-        singleTaskPanel.add(chooseFileButton);
-        singleTaskPanel.add(startIndex);
-        singleTaskPanel.add(endIndex);
-        singleTaskPanel.add(goOrStopButton);
-        singleTaskPanel.add(progressIndicator);
-        singleTaskPanel.add(removeButton);
-    }
-
     protected void invalidateImage(int imageToReset) {
         System.out.println("invalidateImage TODO");
         // TODO
@@ -315,9 +224,14 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
             flagJobAsStarted(jobID, false);
             break;
         case "FRAME_ASSIGNED":
-            jobID = Integer.valueOf(words[3]);
-            int frame = Integer.valueOf(words[2]);
-            flagImageAsStarted(jobID, frame, true);
+            // Only update if the table is currently displaying this job
+            String jobTitle = words[1];
+            if (jobTitle.equals(jobDetailsTitle.getText())) {
+                // The updated frame is part of the currently displayed job, so we update the table.
+                jobID = Integer.valueOf(words[3]);
+                int frame = Integer.valueOf(words[2]);
+                flagImageAsStarted(jobID, frame, true);
+            }
             break;
         case "JOB_DETAILS":
             // Rebuild jobDetailsTable with the new info
@@ -371,9 +285,11 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
      */
     private void flagImageAsStarted(int jobID, int frame, boolean started) {
 
-        DefaultTableModel model = (DefaultTableModel) jobDetailsTable.getModel();
-        if (started) {
-            model.setValueAt("In progress", frame, 0);
+        if (jobDetailsTable != null) {
+            DefaultTableModel model = (DefaultTableModel) jobDetailsTable.getModel();
+            if (started) {
+                model.setValueAt("In progress", frame, 1);
+            }
         }
     }
 
@@ -458,6 +374,7 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
 
         for (String singleFrameInfo : allFramesInfo) {
             String info[] = singleFrameInfo.split(":");
+
             if (info.length == 1) {
                 // This line can be "JOB_DETAILS" or the name of the job.
                 if (!info[0].equals("JOB_DETAILS")) {
