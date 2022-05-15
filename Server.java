@@ -71,7 +71,6 @@ public class Server implements Subscriber {
         for (Job job : jobList) {
             info = job.getNextImageInfo();
             if (!info.equals("none")) {
-                System.out.println("Server requested info " + info + " from Job ranked " + jobRank);
                 // Tell the display that an image is being assigned to a client.
                 String notif = "FRAME_ASSIGNED " + info + " " + jobRank;
                 notifyListeners(notif);
@@ -351,10 +350,12 @@ public class Server implements Subscriber {
             return;
         }
         Job selectedJob = null;
+        int jobRank = 0;
         for (Job j : jobList) {
             if (j.getName().equals(jobName)) {
                 selectedJob = j;
             }
+            jobRank++;
         }
         if (selectedJob != null) {
             // Send info now
