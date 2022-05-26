@@ -81,7 +81,7 @@ public class BlenderParallelRendering {
 
                 @Override
                 public void run() {
-                    System.out.println("Launching client");
+                    System.out.println("Launching client to connect with server at " + serverIP);
                     clientDisplay = new ClientDisplay(serverIP);
                 }
             }.start();
@@ -94,7 +94,7 @@ public class BlenderParallelRendering {
      */
     private static void readClientOrServer() {
         try {
-            String filename = "src/blenderparallelrendering/settings.txt";
+            String filename = "./settings.txt";
             BufferedReader reader = new BufferedReader(new FileReader(filename));
             String line;
             isClient = false;
@@ -107,6 +107,7 @@ public class BlenderParallelRendering {
                     isServer = true;
                 } else {
                     serverIP = line;
+                    System.out.println("Main program reading config IP: " + serverIP);
                 }
             }
         } catch (FileNotFoundException e) {

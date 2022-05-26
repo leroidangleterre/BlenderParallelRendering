@@ -27,7 +27,7 @@ public class ClientDisplay extends JFrame {
     String STOP_CLIENT = "Stop client";
 
     public ClientDisplay(String serverIP) {
-        setTitle("Client window");
+        setTitle("Client GUI (server at IP " + serverIP + ")");
         setVisible(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         isActive = false;

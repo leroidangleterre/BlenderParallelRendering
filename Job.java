@@ -54,9 +54,9 @@ public class Job {
                     // We found an image that has yet to be assigned.
                     String info;
                     info = filename + " " + /*date + " " +*/ frameNumberList.get(rank);
-                    System.out.println("info: " + info);
                     frameStatusList.set(rank, Status.IN_PROGRESS);
                     rank++;
+                    System.out.println("Job.getNextImageInfo() returning " + info);
                     return info;
                 }
             }

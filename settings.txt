@@ -1,3 +1,0 @@
-CLIENT
-SERVER
-127.0.0.1 replace this with the server's IP
