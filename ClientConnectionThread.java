@@ -1,12 +1,21 @@
 package blenderparallelrendering;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -17,16 +26,22 @@ import java.util.logging.Logger;
 public class ClientConnectionThread extends Thread {
 
     private String serverIP;
+    private InetAddress serverAddress;
+    private Socket socket;
     private int port;
     private boolean isActive;
 
     private long sleepDurationInMillis = 1000;
     private long imageRenderSimulationTime = 4000;
 
+    private final String NEED_FILE = "need_file";
+    private File localFile; // The local version of the .blend file, as received from the server
+
     public ClientConnectionThread(String serverIPParam, int portParam) {
         serverIP = serverIPParam;
         port = portParam;
         isActive = false;
+        localFile = null;
     }
 
     @Override
@@ -35,8 +50,7 @@ public class ClientConnectionThread extends Thread {
         isActive = true;
 
         while (isActive) {
-            Socket socket = new Socket();
-            InetAddress serverAddress;
+            socket = new Socket();
             try {
 
                 serverAddress = InetAddress.getByName(serverIP);
@@ -48,11 +62,14 @@ public class ClientConnectionThread extends Thread {
                 if (jobName.equals("none")) {
                     System.out.println("Client: Nothing available.");
                     Thread.sleep(sleepDurationInMillis);
+                } else if (fromServer.contains("error")) {
+                    System.out.println("ClientConnectionThread error when receiving from server: <" + fromServer + ">");
+                    Thread.sleep(sleepDurationInMillis);
                 } else {
                     int frame = Integer.valueOf(fromServer.split(" ")[2]);
                     System.out.println("Client received from server: " + jobName + ", frame " + frame);
 
-                    workOnFrame(jobName, frame);
+                    workOnFrame(jobName, frame, in);
 
                 }
 
@@ -78,19 +95,67 @@ public class ClientConnectionThread extends Thread {
 
     /**
      * Render an image from the animation.
-     * Check the file version and download any required material.
+     * The client must check the file's existence and download any required
+     * material.
+     *
+     * @param jobName the path to the .blend file
+     * @param in the communication channel with the server (used to request and
+     * get a new file)
      */
-    private void workOnFrame(String jobName, int frame) {
+    private void workOnFrame(String jobName, int frame, BufferedReader in) {
         System.out.println("Client working on job " + jobName + ", frame " + frame);
         try {
-            Thread.sleep(imageRenderSimulationTime);
             // Check the .blend file (name and date), send a request if necessary
+
+            // Isolate the filename from the folder (e.g. isolate "myfile.blend" from input "D\Blender\project\myFile.blend")
+            // Double the backslashes in the filename
+            String escapedJobName = jobName.replace("\\", "\\\\");
+            // Split on double backslashes
+            String[] split = escapedJobName.split("\\\\");
+            String filename = split[split.length - 1];
+
+            Path userDir = Paths.get(System.getProperty("user.dir"));
+            Path localBlendFiles = userDir.resolve("localBlendFiles");
+
+            File file = new File(localBlendFiles + "\\\\" + filename);
+
+            if (!file.exists()) {
+                System.out.println("Client does not have the file <" + file + ">");
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                System.out.println("Client sending file request to server");
+                out.println(NEED_FILE + " " + jobName);
+
+                // Receive file from server.
+                try {
+                    System.out.println("Client opening input stream.");
+                    DataInputStream dataStream = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+                    FileOutputStream fileStream = new FileOutputStream(file);
+                    int bufferSize = 4096;
+                    byte[] bytes = new byte[bufferSize];
+                    int count = 0;
+                    while ((count = dataStream.read(bytes)) != -1) {
+                        fileStream.write(bytes, 0, count);
+                    }
+                    fileStream.close();
+                    dataStream.close();
+                    System.out.println("Client has received file.");
+                } catch (IOException e) {
+                    System.out.println("IO exception on client while reading file from server");
+                }
+            }
+
             // Render the image
+            System.out.println("Client working...");
+            Thread.sleep(imageRenderSimulationTime);
             // Send the image to the server
             System.out.println("Client done.");
-        } catch (InterruptedException ex) {
+        } catch (NoSuchFileException ex) {
+            System.out.println(ex);
+        } catch (IOException ex) {
             Logger.getLogger(ClientConnectionThread.class.getName()).log(Level.SEVERE, null, ex);
             System.out.println("Client error.");
+        } catch (InterruptedException ex) {
+            Logger.getLogger(ClientConnectionThread.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 }

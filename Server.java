@@ -1,8 +1,12 @@
 package blenderparallelrendering;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -52,7 +56,7 @@ public class Server implements Subscriber {
             }
 
         } catch (IOException e) {
-            System.out.println("Server: IOException");
+            System.out.println("    Server: IOException");
             System.out.println(e);
         }
     }
@@ -64,6 +68,7 @@ public class Server implements Subscriber {
      * @return the image index that the thread must render.
      */
     public synchronized String getNextImageInfo() {
+        System.out.println("    Server.getNextImageInfo()");
 
         String info;
         int jobRank = 0;
@@ -73,6 +78,7 @@ public class Server implements Subscriber {
             if (!info.equals("none")) {
                 // Tell the display that an image is being assigned to a client.
                 String notif = "FRAME_ASSIGNED " + info + " " + jobRank;
+                System.out.println("    Server.getNextImageInfo(): " + notif);
                 notifyListeners(notif);
                 return info;
             }
@@ -100,18 +106,24 @@ public class Server implements Subscriber {
      */
     public void createTestJob() {
         Job j;
+        String testFolder = "D:\\Blender\\MineTrain\\";
+        String testFile;
         switch (jobList.size()) {
         case 0:
-            j = new Job("test_job_1", 0, 10);
+            testFile = "mine.train.blend";
+            j = new Job(testFolder + testFile, 0, 10);
             break;
         case 1:
-            j = new Job("test_job_2", 0, 10);
+            testFile = "mine.train.2.blend";
+            j = new Job(testFolder + testFile, 0, 10);
             break;
         case 2:
-            j = new Job("test_job_3", 0, 10);
+            testFile = "mine.train.3.blend";
+            j = new Job(testFolder + testFile, 0, 10);
             break;
         default:
-            j = new Job("test_job_4", 0, 10);
+            testFile = "mine.train.4.blend";
+            j = new Job(testFolder + testFile, 0, 10);
             break;
         }
         jobList.add(j);
@@ -138,31 +150,40 @@ public class Server implements Subscriber {
         @Override
         public void run() {
 
-//            System.out.println("Server receives connection from client.");
+            System.out.println("    Server receives connection from client.");
             try {
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 String outputLine;
-//
-//                String clientAddress = NODE_NUMBER + "";
-//                NODE_NUMBER++;
-//                boolean loop = true;
-//                int imageSize;
-//
+
                 int bufferSize = 4096;
 //
                 String imageInfo = getNextImageInfo();
-//                display.update(imageInfo, clientAddress + "", false);
                 outputLine = "server_asks_for " + imageInfo;
-                // ---------------- send MESSAGE 1
-//                System.out.println("Server sends img index to client");
                 out.println(outputLine);
-//                System.out.println("Server done sending img index to client");
-//
-//                // Receive reply from client
-//                // ---------------- receive MESSAGE 2
-//                fromClient = in.readLine();
-//                System.out.println("Server received from client: " + fromClient);
+
+                // Receive reply from client
+                System.out.println("    Server ready for client reply");
+                fromClient = in.readLine();
+                System.out.println("    Server received from client: " + fromClient);
+
+                String words[] = fromClient.split(" ");
+                if (words[0].equals("need_file")) {
+                    // Server must send blend file to client.
+                    String filename = imageInfo.split(" ")[0];
+                    System.out.println("Server will now send file <" + filename + "> to client.");
+                    InputStream inputStream = new BufferedInputStream(new FileInputStream(filename));
+                    OutputStream outputStream = clientSocket.getOutputStream();
+                    int bytesRead = 0;
+                    int totalBytesRead = 0;
+                    byte[] buf = new byte[bufferSize];
+                    while ((bytesRead = inputStream.read(buf)) != -1) {
+                        totalBytesRead += bytesRead;
+                        outputStream.write(buf, 0, bytesRead);
+                    }
+                    System.out.println("Server sent " + totalBytesRead + " bytes to client.");
+                }
+
 //                clientAddress = fromClient.split(" ")[1];
 //
 //                if (fromClient.startsWith("server")) {
@@ -351,17 +372,15 @@ public class Server implements Subscriber {
             return;
         }
         Job selectedJob = null;
-        int jobRank = 0;
         for (Job j : jobList) {
             if (j.getName().equals(jobName)) {
                 selectedJob = j;
             }
-            jobRank++;
         }
         if (selectedJob != null) {
             // Send info now
             String message = "JOB_DETAILS";
-            message += " " + selectedJob.getName();
+            message += " FILENAME:" + selectedJob.getName();
             message += " " + selectedJob.getFramesDetail();
             notifyListeners(message);
         }

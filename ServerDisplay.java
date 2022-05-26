@@ -229,8 +229,12 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
             if (jobTitle.equals(jobDetailsTitle.getText())) {
                 // The updated frame is part of the currently displayed job, so we update the table.
                 jobID = Integer.valueOf(words[3]);
-                int frame = Integer.valueOf(words[2]);
-                flagImageAsStarted(jobID, frame, true);
+                try {
+                    int frame = Integer.valueOf(words[2]);
+                    flagImageAsStarted(jobID, frame, true);
+                } catch (NumberFormatException ex) {
+                    System.out.println("ServerDisplay.update(" + message + "): " + ex);
+                }
             }
             break;
         case "JOB_DETAILS":
@@ -353,7 +357,7 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
     }
 
     // Add all the information about frames to the GUI table.
-    private void buildDetailsTable(String[] allFramesInfo) {
+    private void buildDetailsTable(String[] jobInfo) {
 
         Object dataDetails[][] = new Object[][]{
             {"-", "-", "-"}
@@ -365,32 +369,34 @@ public class ServerDisplay extends JFrame implements MouseWheelListener, Subscri
         if (jobDetailsTable == null) {
             jobDetailsTable = new CustomJTable(dataDetails, detailsColumn);
             jobDetailsPanel.add(jobDetailsTable);
+            System.out.println("Table created.");
         } else {
             // Clear table
             while (jobDetailsTable.getRowCount() > 0) {
                 ((DefaultTableModel) jobDetailsTable.getModel()).removeRow(0);
             }
+            System.out.println("Table cleared.");
         }
 
-        for (String singleFrameInfo : allFramesInfo) {
-            String info[] = singleFrameInfo.split(":");
+        for (String infoLine : jobInfo) {
+            System.out.println("    info line <" + infoLine + ">");
+            String info[] = infoLine.split(":");
 
-            if (info.length == 1) {
-                // This line can be "JOB_DETAILS" or the name of the job.
-                if (!info[0].equals("JOB_DETAILS")) {
-                    // Job name
-                    jobDetailsTitle.setText(info[0]);
-                }
-            } else {
-                // This line is actual information about a frame.
-                String frameNumber = info[0];
-                String status = info[1];
-                String host = info[2];
+            if (infoLine.contains("FRAME")) {
+                // Image details, format "FRAME:4:NOT_STARTED:none"
+                String frameNumber = info[1];
+                String status = info[2];
+                String host = info[3];
 
                 // Simply add the new data
                 DefaultTableModel model = (DefaultTableModel) jobDetailsTable.getModel();
                 String[] newRow = {frameNumber, status, host};
                 model.addRow(newRow);
+            } else if (infoLine.contains("FILENAME")) {
+                // filename
+                jobDetailsTitle.setText(info[1]);
+            } else if (infoLine.contains("date")) {
+                // file date
             }
         }
     }
