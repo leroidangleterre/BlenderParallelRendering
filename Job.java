@@ -1,6 +1,14 @@
 package blenderparallelrendering;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * This class describes a render job.
@@ -26,6 +34,14 @@ public class Job {
         startFrame = start;
         endFrame = end;
         initImageList();
+        Path file = Paths.get(filename);
+        try {
+            BasicFileAttributes attr = Files.readAttributes(file, BasicFileAttributes.class);
+        } catch (NoSuchFileException ex) {
+            System.out.println("No file found");
+        } catch (IOException ex) {
+            Logger.getLogger(Job.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
     public String getNextImageInfo() {
@@ -36,12 +52,13 @@ public class Job {
             for (Status s : frameStatusList) {
                 if (s.equals(Status.NOT_STARTED)) {
                     // We found an image that has yet to be assigned.
-                    String info = filename + " " + frameNumberList.get(rank);
-
+                    String info;
+                    info = filename + " " + /*date + " " +*/ frameNumberList.get(rank);
+                    System.out.println("info: " + info);
                     frameStatusList.set(rank, Status.IN_PROGRESS);
+                    rank++;
                     return info;
                 }
-                rank++;
             }
         }
         return "none";
@@ -137,6 +154,7 @@ public class Job {
 
         String framesInfo = "";
         for (int rank = 0; rank < frameNumberList.size(); rank++) {
+            framesInfo += "FRAME:";
             framesInfo += frameNumberList.get(rank) + ":";
             framesInfo += frameStatusList.get(rank) + ":";
             framesInfo += hostList.get(rank) + " ";
