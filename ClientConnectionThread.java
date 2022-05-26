@@ -15,7 +15,7 @@ import java.net.UnknownHostException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.Timestamp;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -107,17 +107,30 @@ public class ClientConnectionThread extends Thread {
         try {
             // Check the .blend file (name and date), send a request if necessary
 
+            String escapedJobName;
+            String[] split;
+            String filename;
+            Path userDir;
+            Path localBlendFiles;
+
             // Isolate the filename from the folder (e.g. isolate "myfile.blend" from input "D\Blender\project\myFile.blend")
             // Double the backslashes in the filename
-            String escapedJobName = jobName.replace("\\", "\\\\");
+            escapedJobName = jobName.replace("\\", "\\\\");
             // Split on double backslashes
-            String[] split = escapedJobName.split("\\\\");
-            String filename = split[split.length - 1];
+            split = escapedJobName.split("\\\\");
+            filename = split[split.length - 1];
 
-            Path userDir = Paths.get(System.getProperty("user.dir"));
-            Path localBlendFiles = userDir.resolve("localBlendFiles");
+            userDir = Paths.get(System.getProperty("user.dir"));
+            localBlendFiles = userDir.resolve("localBlendFiles");
 
-            File file = new File(localBlendFiles + "\\\\" + filename);
+            File file;
+            String separator;
+            if (isWindows()) {
+                separator = "\\\\";
+            } else {
+                separator = "/";
+            }
+            file = new File(localBlendFiles + separator + filename);
 
             if (!file.exists()) {
                 System.out.println("Client does not have the file <" + file + ">");
@@ -145,7 +158,7 @@ public class ClientConnectionThread extends Thread {
             }
 
             // Render the image
-            System.out.println("Client working...");
+            System.out.println("Client working on file " + file);
             Thread.sleep(imageRenderSimulationTime);
             // Send the image to the server
             System.out.println("Client done.");
@@ -156,6 +169,24 @@ public class ClientConnectionThread extends Thread {
             System.out.println("Client error.");
         } catch (InterruptedException ex) {
             Logger.getLogger(ClientConnectionThread.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    /**
+     * Tell if the client is running on Windows or another OS; assume Linux if
+     * not Windows.
+     *
+     * @return true when the client is running on Windows, false for any other
+     * OS.
+     */
+    private boolean isWindows() {
+
+        Properties props = System.getProperties();
+        String osProp = (String) (props.get("os.name"));
+        if (osProp.startsWith("Win")) {
+            return true;
+        } else {
+            return false;
         }
     }
 }
