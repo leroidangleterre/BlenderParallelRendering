@@ -159,7 +159,7 @@ public class ClientConnectionThread extends Thread {
 
             // Render the image
             System.out.println("Client working on file " + file);
-            Thread.sleep(imageRenderSimulationTime);
+            renderImage(file, frame);
             // Send the image to the server
             System.out.println("Client done.");
         } catch (NoSuchFileException ex) {
@@ -167,8 +167,6 @@ public class ClientConnectionThread extends Thread {
         } catch (IOException ex) {
             Logger.getLogger(ClientConnectionThread.class.getName()).log(Level.SEVERE, null, ex);
             System.out.println("Client error.");
-        } catch (InterruptedException ex) {
-            Logger.getLogger(ClientConnectionThread.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -187,6 +185,39 @@ public class ClientConnectionThread extends Thread {
             return true;
         } else {
             return false;
+        }
+    }
+
+    /**
+     * Compute a single image using Blender.
+     *
+     * @param file the .blend file containing the animation
+     * @param frame the index of the single frame that we want to render
+     */
+    private void renderImage(File file, int frame) {
+
+        try {
+            String pathToScript = "C:\\Users\\arthu\\Documents\\Programmation\\Java\\BlenderParallelRendering\\script.sh";
+            String pathToSh = "C:\\Program Files\\Git\\bin\\sh";
+            String[] cmd = new String[]{pathToSh, pathToScript};
+            Process p = Runtime.getRuntime().exec(cmd);
+
+            int returnValue = p.waitFor();
+            System.out.println("return value: " + returnValue);
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println("Script output: " + line);
+            }
+            Thread.sleep(imageRenderSimulationTime);
+        } catch (IOException ex) {
+            System.out.println("IOException when running script by client");
+            Logger.getLogger(ClientConnectionThread.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            System.out.println("Interrupted Exception when running script by client");
+            Logger.getLogger(ClientConnectionThread.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 }
