@@ -59,6 +59,7 @@ public class Job {
                     System.out.println("Job.getNextImageInfo() returning " + info);
                     return info;
                 }
+                rank++;
             }
         }
         return "none";

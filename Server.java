@@ -50,7 +50,9 @@ public class Server implements Subscriber {
 
             avgCalc = new AverageCalculator();
             while (true) {
+                System.out.println("Server waiting for client connection...");
                 Socket clientSocket = serverSocket.accept();
+                System.out.println("Server detected client connection.");
                 cnxHandler = new ConnectionHandler(clientSocket, display);
                 new Thread(cnxHandler).start();
             }
@@ -68,7 +70,6 @@ public class Server implements Subscriber {
      * @return the image index that the thread must render.
      */
     public synchronized String getNextImageInfo() {
-        System.out.println("    Server.getNextImageInfo()");
 
         String info;
         int jobRank = 0;
@@ -78,7 +79,6 @@ public class Server implements Subscriber {
             if (!info.equals("none")) {
                 // Tell the display that an image is being assigned to a client.
                 String notif = "FRAME_ASSIGNED " + info + " " + jobRank;
-                System.out.println("    Server.getNextImageInfo(): " + notif);
                 notifyListeners(notif);
                 return info;
             }
@@ -150,40 +150,33 @@ public class Server implements Subscriber {
         @Override
         public void run() {
 
-            System.out.println("    Server receives connection from client.");
             try {
-                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
-                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                String outputLine;
+                while (true) {
+                    System.out.println("***********************");
+                    System.out.println("*     START           *");
+                    System.out.println("***********************");
+                    PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+                    BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                    String outputLine;
 
-                int bufferSize = 4096;
-//
-                String imageInfo = getNextImageInfo();
-                outputLine = "server_asks_for " + imageInfo;
-                out.println(outputLine);
+                    int bufferSize = 4096;
 
-                // Receive reply from client
-                System.out.println("    Server ready for client reply");
-                fromClient = in.readLine();
-                System.out.println("    Server received from client: " + fromClient);
-
-                String words[] = fromClient.split(" ");
-                if (words[0].equals("need_file")) {
-                    // Server must send blend file to client.
-                    String filename = imageInfo.split(" ")[0];
-                    System.out.println("Server will now send file <" + filename + "> to client.");
-                    InputStream inputStream = new BufferedInputStream(new FileInputStream(filename));
-                    OutputStream outputStream = clientSocket.getOutputStream();
-                    int bytesRead = 0;
-                    int totalBytesRead = 0;
-                    byte[] buf = new byte[bufferSize];
-                    while ((bytesRead = inputStream.read(buf)) != -1) {
-                        totalBytesRead += bytesRead;
-                        outputStream.write(buf, 0, bytesRead);
+                    String imageInfo = getNextImageInfo();
+                    if (imageInfo.equals("none")) {
+                        // No job is available, do not reply to the client.
                     }
-                    System.out.println("Server sent " + totalBytesRead + " bytes to client.");
-                }
+                    outputLine = "server_asks_for " + imageInfo;
+                    System.out.println("Server asking: " + outputLine);
+                    out.println(outputLine);
 
+                    // Receive reply from client
+                    System.out.println("    Server ready for client reply");
+                    fromClient = in.readLine();
+                    System.out.println("    Server received from client: " + fromClient);
+
+                    String words[] = fromClient.split(" ");
+
+                    // Receive image computed by the client
 //                clientAddress = fromClient.split(" ")[1];
 //
 //                if (fromClient.startsWith("server")) {
@@ -223,17 +216,12 @@ public class Server implements Subscriber {
 //                    fileStream.close();
 //                    dataStream.close();
 //                }
-//                display.update(imageInfo, clientAddress, true);
-//
-//                avgCalc.add((int) System.currentTimeMillis());
-//
-//                String eta = getETA();
-//                System.out.println("Node " + clientAddress + " f<" + imageInfo + "> " + eta);
-//                notifyListeners("eta " + eta);
-//
+                }
             } catch (IOException e) {
                 System.out.println("Error in handling connection");
                 nbClientsConnected--;
+            } catch (NullPointerException e) {
+                System.out.println("Error: client did not reply properly.");
             }
         }
 
